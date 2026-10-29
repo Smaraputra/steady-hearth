@@ -33,7 +33,35 @@ local function memory_cap_test(limit_mb)
    log('memory_freed|lua_kb=%d', math.floor(collectgarbage('count')))
 end
 
+-- Load-time marks (PERF_PROBE|load|...): real time and Lua heap when this script runs, when every mod
+-- is loaded, when a saved game has finished loading, and at the first game loop after that. With the
+-- start-up marks of overrides/stonehearth_server.lua they split a launch or a save load into phases.
+local load_mark = function(what)
+   radiant.log.write_('perf_probe', 0, 'PERF_PROBE|load|what=%s|realtime=%.3f|lua_kb=%d', what,
+      _host:get_realtime(), math.floor(collectgarbage('count')))
+end
+load_mark('perf_probe_server_init')
+-- mods.perf_probe.profile_load=true profiles from required_loaded to the first game loop: at a save
+-- load that window holds the restore of every saved object (game_loaded) and the first loop's work
+local profile_load = tostring(_host:get_config('mods.perf_probe.profile_load')) == 'true'
+radiant.events.listen(radiant, 'radiant:game_loaded', function()
+      load_mark('game_loaded')
+      radiant.events.listen_once(radiant, 'radiant:gameloop', function()
+            load_mark('first_gameloop_after_load')
+         end)
+   end)
+
 radiant.events.listen(radiant, 'radiant:required_loaded', function()
+      load_mark('required_loaded')
+      if tostring(_host:get_config('mods.perf_probe.material_check')) == 'true' and stonehearth.catalog then
+         probe_lib.material_check(stonehearth.catalog)
+      end
+      if profile_load then
+         probe_lib.toggle_profiler('load_on')
+         radiant.events.listen_once(radiant, 'radiant:gameloop', function()
+               probe_lib.toggle_profiler('load_off')
+            end)
+      end
       probe_lib.report_hooks('server')
       local limit = tonumber(_host:get_config('mods.perf_probe.memory_cap_mb'))
       if limit then

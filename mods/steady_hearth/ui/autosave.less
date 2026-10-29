@@ -1,0 +1,28 @@
+// Steady Hearth: the autosave interval and slot selectors beside the save dialog's autosave checkbox
+// (ui/autosave.js). Colours are the base game's: the dark well (#322f28) as the field, the gold of its
+// help text (#bca058) as the edge, at least 3:1 against every surface the dialog uses, and the heading
+// gold (#cbb373) as the keyboard focus ring, which the base reset otherwise removes.
+#autoSaveSetting #steadyAutoSave {
+   margin-left: 16px;
+   white-space: nowrap;
+
+   label {
+      margin: 0 6px 0 10px;
+   }
+
+   select {
+      font: inherit;
+      color: #e8dcb8;
+      background: #322f28;
+      border: 1px solid #bca058;
+      border-radius: 2px;
+      padding: 2px 4px;
+      min-height: 28px;
+      cursor: pointer;
+   }
+
+   select:focus {
+      outline: 2px solid #cbb373;
+      outline-offset: 1px;
+   }
+}

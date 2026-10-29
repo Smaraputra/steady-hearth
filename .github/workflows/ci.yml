@@ -19,6 +19,21 @@ jobs:
           find mods -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
           echo "$(find mods -name '*.lua' | wc -l) Lua files parsed"
 
+      - name: JS syntax (node --check on every mod UI script and inline HTML script)
+        run: |
+          n=0
+          # a failing check must stop the step: under bash -e a failure inside an && list does not
+          for f in $(find mods -name '*.js'); do node --check "$f"; n=$((n + 1)); done
+          for f in $(find mods -name '*.html'); do
+            python3 -c 'import re, sys; print("\n".join(re.findall(r"<script>(.*?)</script>", open(sys.argv[1]).read(), re.S)))' "$f" > "$RUNNER_TEMP/inline.js"
+            node --check "$RUNNER_TEMP/inline.js"; n=$((n + 1))
+          done
+          echo "$n JS files and HTML pages checked"
+
+      - name: Lua tests (Lua 5.1)
+        run: |
+          for t in tools/tests/lua/*_test.lua; do lua5.1 "$t"; done
+
       - name: Mod manifests are valid JSON
         run: |
           for f in $(find mods -name 'manifest.json'); do python3 -m json.tool "$f" > /dev/null && echo "ok $f"; done

@@ -8,10 +8,10 @@
 -- the part names its own module, script or global, with path). They are installed together only when
 -- every one passes its guard. Instead of replacement, a patch or part may give wrap(original), which
 -- builds the replacement around the method its guard accepted. patch.requires lists functions of
--- other modules ({ module, method, expect } each) that the patch copies or calls and that must pass
--- the same guard, without being replaced. patch.superseded_by names an earlier patch in PATCHES that
--- replaces the same method and includes this one's change; while it is installed this one is
--- skipped. A patch is installed only when
+-- other modules, scripts or globals ({ module, script or global, optional path, method, expect } each)
+-- that the patch copies or calls and that must pass the same guard, without being replaced.
+-- patch.superseded_by names an earlier patch in PATCHES that replaces the same method and includes
+-- this one's change; while it is installed this one is skipped. A patch is installed only when
 --   * its toggle mods.steady_hearth.patches.<id> is true (each patch declares its default),
 --   * ACE is loaded when the patch targets ACE code (target_ace = true), not loaded when it targets
 --     base code that ACE replaces (target_ace = false); target_ace = nil applies in both cases,
@@ -47,13 +47,16 @@ local PATCHES = {
    'steady_hearth.patches.ace_restock_validity_window',
    'steady_hearth.patches.base_material_check_memo',
    'steady_hearth.patches.ace_material_check_memo',
+   'steady_hearth.patches.base_resource_keys_by_uri',
+   'steady_hearth.patches.ace_resource_keys_by_uri',
+   'steady_hearth.patches.personality_log_cap',
 }
 
 local function log(fmt, ...)
    radiant.log.write_('steady_hearth', 0, fmt, ...)
 end
 
-local VERSION = '1.2.0'   -- keep in step with CHANGELOG.md
+local VERSION = '1.3.0'   -- keep in step with CHANGELOG.md
 
 local function enabled(patch)
    local value = _host:get_config('mods.steady_hearth.patches.' .. patch.id)
@@ -160,10 +163,10 @@ local function install(ace_loaded)
          end
          if ok then
             for _, req in ipairs(patch.requires or {}) do
-               local found, req_target = pcall(radiant.mods.require, req.module)
-               ok, why = matches(found and type(req_target) == 'table' and req_target[req.method] or nil, req.expect)
+               local req_target = resolve_target(req)
+               ok, why = matches(type(req_target) == 'table' and req_target[req.method] or nil, req.expect)
                if not ok then
-                  why = 'requires ' .. req.module .. '.' .. req.method .. ': ' .. why
+                  why = 'requires ' .. target_name(req) .. '.' .. req.method .. ': ' .. why
                   break
                end
             end

@@ -85,6 +85,13 @@ while :; do
 done
 "$WINESERVER" -w 2>/dev/null
 
+# ACE must be installed one way only: an unpacked folder next to the packed .smod would load twice or
+# shadow the pinned revision
+if [ -d "$SH_GAME_DIR/mods/stonehearth_ace" ] && [ -f "$SH_GAME_DIR/mods/stonehearth_ace.smod" ]; then
+   echo "ACE is installed both unpacked and packed in $SH_GAME_DIR/mods; keep only stonehearth_ace.smod" >&2
+   exit 64
+fi
+
 run_dir="$SH_ROOT/runs/$(date +%Y%m%d-%H%M%S)-$name"
 mkdir -p "$run_dir"
 log="$SH_GAME_DIR/stonehearth.log"
@@ -185,6 +192,22 @@ for d in "$SH_GAME_DIR" "$SH_GAME_DIR/x64"; do
         ls -l "$d/saved_games/perf_bench_probe"; } > "$run_dir/save_probe.txt"
       rm -rf "$d/saved_games/perf_bench_probe"
    fi
+   # fixture saves (mods.perf_bench.save_id=perf_bench_fixture_*) stay in saved_games/ for load
+   # runs and are archived once under runs/fixtures/<id>/ with the run that made them, so a later
+   # run can never overwrite a baseline
+   for f in "$d"/saved_games/perf_bench_fixture_*; do
+      [ -d "$f" ] || continue
+      id="$(basename "$f")"
+      if [ ! -d "$SH_ROOT/runs/fixtures/$id" ]; then
+         mkdir -p "$SH_ROOT/runs/fixtures"
+         cp -R "$f" "$SH_ROOT/runs/fixtures/$id"
+         { echo "made_by=$(basename "$run_dir")"; echo "kb=$(du -sk "$f" | cut -f1)"; cat "$run_dir/args.txt"; } \
+            > "$SH_ROOT/runs/fixtures/$id/fixture.txt"
+         echo "fixture=$id" >> "$run_dir/save_probe.txt"
+      fi
+   done
+   # per-object byte counts written by network.dump_data_object_byte_counts (location unverified)
+   [ -f "$d/data_object_byte_counts.json" ] && mv "$d/data_object_byte_counts.json" "$run_dir/"
 done
 slept=$(python3 -c "print(round($(sleep_offset) - $offset_start))")
 # classified script errors, so a run is reviewable even when nobody watched it live

@@ -15,7 +15,7 @@
 
 # Steady Hearth
 
-Performance and stability fixes for Stonehearth 1.1, in one small mod. It works on the base game and is compatible with the [ACE mod](https://github.com/StonehearthACE-team/stonehearth_ace), and includes fixes that improve performance when ACE is installed. Every fix is measured, can be switched off, and leaves nothing in your save files.
+Performance and stability fixes for Stonehearth 1.1, in one small mod. It works on the base game and is compatible with the [ACE mod](https://github.com/StonehearthACE-team/stonehearth_ace), and includes fixes that improve performance when ACE is installed. Every change is measured, can be switched off, and adds nothing to your town's saved state.
 
 > **Disclaimer.** Steady Hearth is an unofficial community mod. It is not affiliated with, endorsed by, or supported by Radiant Entertainment, Riot Games, or the Stonehearth ACE team. ACE is not required; where this README mentions ACE, it describes compatibility and the fixes that apply to ACE's code, not a partnership. Use it at your own risk and keep a backup of your saves. Please report problems here, not to the game's or ACE's developers.
 
@@ -37,6 +37,22 @@ The mod patches the game's Lua code at load time. Each patch first checks that t
 
 Measured on the project's benchmark: an XL scenario with 4 player towns of 28 hearthlings each, at game speed 2, under Wine on an Apple M4 Pro. The numbers compare runs with and without each fix on the same machine, and your own frame rates will differ. Method, raw numbers and caveats for every row are in [`docs/experiments/`](docs/experiments/). These rows were measured on the flat map of scenario v3. Scenario xl-v4 (2026-10-29) adds two ridges with stepped passes, a lake beside every town and scattered wild trees, and its first profiles are in [`docs/atlas/profiles-2026-10-28.md`](docs/atlas/profiles-2026-10-28.md).
 
+## Faster loading, smaller saves, better autosave
+
+Version 1.3.0 targets the time between clicking Load and playing, and what a save carries.
+
+| Change | Applies to | Problem | Measured effect |
+| :--- | :--- | :--- | :--- |
+| Loading screen wait | Base game and ACE | After a save has loaded, the loading screen kept the game hidden for another 0.7 s per second of loading, up to 35 s | Save load to playable **109.7 s to 74.3 s** with ACE (with the catalog change below), **38.1 s to 32.1 s** without ([experiment 011](docs/experiments/011-loading-warmup-cap.md)) |
+| Catalog material tags | ACE | At every launch and save load the catalog lists every combination of every item's material tags (586,883 with ACE) and builds and hashes each one from scratch | **3.7 to 4.0 s** shorter at every launch and save load, identical results ([experiment 010](docs/experiments/010-material-subsets-incremental.md)) |
+| Inventory restore | Base game and ACE | When a save loads, every stored item is checked against every resource material (105 with ACE), though the answer depends only on the item type | With ACE the restore step of a save load **12.9 s to 11.6 s** (one run pair), no measurable change without ACE ([experiment 012](docs/experiments/012-resource-keys-by-uri.md)) |
+| Citizen journals | Base game and ACE | Every citizen's journal keeps a page for every day of the game, though only today's page is ever shown | With 60 days of journals the save is **4.8 MB (7.9%) smaller**, more in longer games ([experiment 014](docs/experiments/014-personality-log-cap.md)) |
+| Autosave | Base game | One autosave slot, overwritten every 5 minutes | The save dialog sets the interval (5 to 30 minutes) and how many autosaves to keep (1 to 10). The oldest is deleted only after a new one has saved ([experiment 013](docs/experiments/013-autosave-rotation.md)) |
+
+Measured with save loads of the XL benchmark's saves under Wine on an Apple M4 Pro. Your load times will differ. The save-load breakdown behind these changes is in [`docs/atlas/load-save-ui.md`](docs/atlas/load-save-ui.md).
+
+Two of these replace a whole game file rather than patching a function: `stonehearth/ui/root/loading.html` and `stonehearth/components/material/material.lua` (a copy of each with marked changes). Another mod that replaces the same file conflicts with them, and whichever loads last wins. With ACE installed, ACE's own autosave settings apply and Steady Hearth's autosave change stays off.
+
 ## Install
 
 1. Download `steady_hearth-<version>.zip` from the [latest release](https://github.com/Smaraputra/steady-hearth/releases/latest) and extract it (or download this repository with **Code > Download ZIP** and use its `mods/steady_hearth` folder).
@@ -45,7 +61,7 @@ Measured on the project's benchmark: an XL scenario with 4 player towns of 28 he
 
 ACE is optional. With ACE installed the ACE fixes apply automatically; without it only the base-game fixes do. Keep the folder name `steady_hearth`.
 
-**Uninstall:** delete the folder. Saves made with the mod load without it, because no patch writes anything to a save.
+**Uninstall:** delete the folder. Saves made with the mod load without it, because no change adds anything to a town's saved state. The journal change only drops journal pages older than 30 days, which the game never shows, and Steady Hearth's autosaves are ordinary saves.
 
 **Compatibility:** tested with Stonehearth 1.1.0.949, with and without ACE at commit `f55f2c146` (`unstable-work`). Single player only so far; multiplayer is untested.
 
@@ -76,16 +92,34 @@ Every fix has a switch. Add it to the `user_settings.json` file in your Stonehea
 | `base_placement_requests_release`, `ace_placement_requests_release` | on | Stale placement requests |
 | `base_chunk_node_working_regions`, `ace_titles_nil_threshold` | on | Script errors |
 | `base_material_check_memo`, `ace_material_check_memo` | on | Material checks |
+| `loading_warmup_cap` | on | Loading screen wait, at most `loading_warmup_s` seconds after loading (default 3) |
+| `material_subsets_incremental` | on | Catalog material tags |
+| `base_resource_keys_by_uri`, `ace_resource_keys_by_uri` | on | Inventory restore |
+| `personality_log_cap` | on | Citizen journals, keeping `personality_log_days` days (default 30) |
+| `autosave_rotation` | on | Autosave (base game); the dialog writes `autosave_minutes` and `autosave_slots` |
 | `base_restock_rating_cache` | off | Uses the restock director's unused rating cache. It changes which errands hearthlings pick and is not yet measured on its own |
 | `base_restock_validity_window`, `ace_restock_validity_window` | off | Trusts a checked restock errand for about a second. Runs with it on did less town work, so it is off until measured on its own |
 | `grid_location_trace` | off | Fewer allocations in position traces; correct, but no measurable gain yet |
 | `task_feeder_safe_unfeed` | off | Removes task actions that pile up on hearthlings who change jobs; no CPU gain measured yet |
 
+The values `loading_warmup_s`, `personality_log_days`, `autosave_minutes` and `autosave_slots` sit directly under `steady_hearth`, beside `patches`, for example a 10-second loading wait and 60 days of journals:
+
+```json
+{
+   "mods": {
+      "steady_hearth": {
+         "loading_warmup_s": 10,
+         "personality_log_days": 60
+      }
+   }
+}
+```
+
 Patches named `ace_*` only install when ACE is present, and most `base_*` patches only without it, because ACE replaces that code. The game log (`stonehearth.log`) lists every patch at startup as `installed`, `disabled`, `skipped` or `superseded`.
 
 ## Reporting problems
 
-Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.2.0: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
+Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.3.0: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How this was made
 
@@ -100,8 +134,8 @@ Everything needed to rerun the benchmarks is in this repository:
 | `mods/steady_hearth/` | The mod |
 | `mods/perf_bench/` | The benchmark scenario: builds the XL world (4 towns, buildings, storage, crafters, raids, ridges with passes, a lake per town) from one shared map definition (`bench_map.lua`) and logs KPIs per game hour |
 | `mods/perf_census/` | Diagnostic counters (listeners, caches, AI actions, placement requests, search times); never enabled in timing runs |
-| `mods/perf_probe/` | Runtime probes (what the sandbox exposes, heap ceiling) |
-| `tools/` | Run harness: `bench.sh` (one run), `run_game.sh` (one game with watchdog, host sleep detection and error log), `queue.py` (resumable run plans), `parse_bench.py`, `ab_report.py` (A/B statistics), `phase_report.py`, `profile_report.py`, `watch_errors.py`, `bench_layout.py` (checks and draws the map layout of a run) |
+| `mods/perf_probe/` | Runtime probes (what the sandbox exposes, heap ceiling) and load diagnostics: start-up and catalog timing, save-load phase marks, a journal filler for save-size tests |
+| `tools/` | Run harness: `bench.sh` (one run), `run_game.sh` (one game with watchdog, host sleep detection and error log), `queue.py` (resumable run plans), `parse_bench.py`, `ab_report.py` (A/B statistics), `phase_report.py`, `profile_report.py`, `watch_errors.py`, `bench_layout.py` (checks and draws the map layout of a run), `load_game.sh` and `load_report.py` (load a save and split the load into phases) |
 | `docs/harness/` | How the harness works and how to set it up (`wine.md` for macOS, `bench.md` for the scenario and run rules) |
 | `docs/experiments/` | One file per fix: hypothesis, change, runs, results and decision |
 | `docs/ace-notes.md` | The ACE issues found, with evidence |
@@ -121,4 +155,4 @@ The ACE-specific findings are written up in [`docs/ace-notes.md`](docs/ace-notes
 
 ## License and credits
 
-The code in this repository is released under the MIT License (see [`LICENSE`](LICENSE)). Patches that replace a game or ACE function contain a copy of that function with a marked change; those excerpts remain the property of their authors, Radiant Entertainment for the base game and the Stonehearth ACE team for ACE (MIT License). Stonehearth is a trademark of its owners. The banner and icon are original artwork made for this project with an AI image generator. Thanks to the ACE team for keeping Stonehearth alive.
+The code in this repository is released under the MIT License (see [`LICENSE`](LICENSE)). Patches that replace a game or ACE function, and the files that replace a game file (Steady Hearth's `loading.html` and `material.lua`, and `perf_probe`'s diagnostic copies of the game's start-up scripts), contain a copy of that code with marked changes. Those excerpts remain the property of their authors, Radiant Entertainment for the base game and the Stonehearth ACE team for ACE (MIT License). Stonehearth is a trademark of its owners. The banner and icon are original artwork made for this project with an AI image generator. Thanks to the ACE team for keeping Stonehearth alive.

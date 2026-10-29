@@ -4,5 +4,17 @@
       "namespace" : "steady_hearth",
       "version" : 3
    },
-   "server_init_script" : "file(steady_hearth_server)"
+   "server_init_script" : "file(steady_hearth_server)",
+   "overrides" : {
+      "stonehearth/components/material/material.lua" : "file(overrides/stonehearth/components/material/material.lua)",
+      "stonehearth/ui/root/loading.html" : "file(ui/root/loading.html)"
+   },
+   "ui" : {
+      "js" : [
+         "file(ui/autosave.js)"
+      ],
+      "less" : [
+         "file(ui/autosave.less)"
+      ]
+   }
 }

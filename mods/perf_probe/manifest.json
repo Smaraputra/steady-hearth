@@ -5,5 +5,24 @@
       "version" : 3
    },
    "server_init_script" : "file(perf_probe_server)",
-   "client_init_script" : "file(perf_probe_client)"
+   "client_init_script" : "file(perf_probe_client)",
+   "overrides" : {
+      "stonehearth/stonehearth_server.lua" : "file(overrides/stonehearth_server.lua)",
+      "stonehearth/stonehearth_client.lua" : "file(overrides/stonehearth_client.lua)"
+   },
+   "functions" : {
+      "ui_mark" : {
+         "controller" : "file(call_handlers/ui_mark_call_handler.lua)",
+         "endpoint" : "client"
+      },
+      "fill_personality_log" : {
+         "controller" : "file(call_handlers/personality_fill_call_handler.lua)",
+         "endpoint" : "server"
+      }
+   },
+   "ui" : {
+      "js" : [
+         "file(ui/load_probe.js)"
+      ]
+   }
 }

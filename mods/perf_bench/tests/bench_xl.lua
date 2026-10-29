@@ -118,10 +118,11 @@ local FOOTMAN_TALISMAN = 'stonehearth:footman:wooden_sword_talisman'
 -- builders, so no building plan jobs run.
 local live_config = _host:get_config('mods.perf_bench.live_buildings')
 local LIVE_BUILDINGS = not (live_config == false or live_config == 'false')
--- Diagnostic runs only: mods.perf_bench.post_probes=true runs the client probes (perf_bench_client)
+-- Diagnostic runs only: mods.perf_bench.post_probes=true (profile and save) or =save (save only) runs
+-- the client probes (perf_bench_client)
 -- after the measured window and waits up to PROBE_TIMEOUT_S for their report before ending.
 local probes_config = _host:get_config('mods.perf_bench.post_probes')
-local POST_PROBES = probes_config == true or probes_config == 'true'
+local POST_PROBES = probes_config == true or probes_config == 'true' or probes_config == 'save'
 local PROBE_TIMEOUT_S = 180
 
 -- Every placement point is checked against the map, less a margin, and logged when outside it.

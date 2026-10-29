@@ -60,7 +60,9 @@ def patch_on(cfg, patch_id):
 
 
 def ace(cfg):
-    return cfg.get('mods.directory.stonehearth_ace.enabled') == 'true'
+    # ACE is installed packed since 2026-10-29 (mods.zip.*); older runs used the unpacked folder
+    return (cfg.get('mods.zip.stonehearth_ace.enabled') == 'true'
+            or cfg.get('mods.directory.stonehearth_ace.enabled') == 'true')
 
 
 def churn(cfg):

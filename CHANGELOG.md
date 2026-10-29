@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0 (2026-10-30)
+
+Faster loading, smaller saves and a better autosave. Every change has a switch and is on by default.
+- Loading screen wait (`loading_warmup_cap`): after a save has loaded, the game's loading screen waited another 0.7 s per second of loading, up to 35 s, before showing the game. It now waits at most 3 s (`loading_warmup_s`). Save load to playable: 109.7 s to 74.3 s with ACE (together with the next change), 38.1 s to 32.1 s without.
+- Catalog material tags (`material_subsets_incremental`, matters with ACE): the catalog's list of every combination of every item's material tags is now built incrementally, with identical results (checked on all 586,883 with ACE), 3.7 to 4.0 s faster at every launch and save load. This replaces the game file `stonehearth/components/material/material.lua` with a marked copy.
+- Inventory restore (`base_resource_keys_by_uri`, `ace_resource_keys_by_uri`): when a save loads, each stored item's resource materials are worked out once per item type instead of once per item. With ACE the restore step of a save load falls from 12.9 s to 11.6 s (one run pair), with no measurable change without ACE. Same results: every remembered answer was rechecked in test loads, 0 differences.
+- Citizen journals (`personality_log_cap`): journals keep the last 30 days (`personality_log_days`) instead of every day of the game. The game only ever shows today's page. With 60 days of journals the save is 4.8 MB (7.9%) smaller.
+- Autosave for the base game (`autosave_rotation`): the save dialog sets the interval (5 to 30 minutes) and how many autosaves to keep (1 to 10). Each autosave is a new save, and the oldest of the same world is deleted only after a new one has saved. With ACE, ACE's own autosave settings apply.
+- Measurement tools: `tools/load_game.sh` loads a save and splits the load into phases (`tools/load_report.py`), and `perf_probe` times the game's start-up and catalog.
+
 ## 1.2.0 (2026-10-29)
 
 - Material check memo (`base_material_check_memo`, `ace_material_check_memo`, on): the game checks an item's material tags against a requested material (for example "wood resource") for every candidate item in many searches. The answer depends only on the two descriptions, so it is now remembered after the first check. Same answers (checked against the original on every hundredth call, 0 differences in about 2.8 million answers), and material checks fall from 4.1% to 2.8% of Lua time in the base game and from 7.3% to 5.1% with ACE.

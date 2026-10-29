@@ -41,7 +41,8 @@ done
 perf="${PERF_MOD:-false}"
 
 exec "$here/run_game.sh" "bench-$size-$variant-$label" "$timeout_s" \
-   mods.directory.stonehearth_ace.enabled=$ace \
+   mods.zip.stonehearth_ace.enabled=$ace \
+   mods.directory.stonehearth_ace.enabled=false \
    mods.directory.mac_gl_compat.enabled=$ace \
    mods.directory.perf_probe.enabled=$probe \
    mods.directory.perf_census.enabled=$census \
