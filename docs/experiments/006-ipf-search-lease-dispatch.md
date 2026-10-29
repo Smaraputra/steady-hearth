@@ -6,7 +6,7 @@ A running `IpfSearch` (`stonehearth/components/pathfinder/ipf_search.lua:145-150
 
 ## Change
 
-`ipf_search_lease_dispatch` (default off): `_start_pathfinder` and `_stop_pathfinder` are copies of the base game's with the per-search listener replaced by one shared listener and an index from solution entity id to the searches holding it (added when a solution is found, removed when the search stops). A release calls only the indexed searches, each in its own protected call, in start order, and each still checks its own solutions at that moment. Reviews: Codex rounds 1 to 3 (`docs/research/reviews/2026-10-29-lease-dispatch-review-codex.md`: round 3 found no issues).
+`ipf_search_lease_dispatch` (on by default since 2026-10-29, see section "Profile with the patch"): `_start_pathfinder` and `_stop_pathfinder` are copies of the base game's with the per-search listener replaced by one shared listener and an index from solution entity id to the searches holding it (added when a solution is found, removed when the search stops). A release calls only the indexed searches, each in its own protected call, in start order, and each still checks its own solutions at that moment. Reviews: Codex rounds 1 to 3 (unpublished notes: round 3 found no issues).
 
 ## Plan
 
@@ -15,7 +15,7 @@ A running `IpfSearch` (`stonehearth/components/pathfinder/ipf_search.lua:145-150
 
 ## Results
 
-Pending.
+On by default since 2026-10-29 (see section "Profile with the patch").
 
 ### Correctness (2026-10-29, one game day each, not census)
 

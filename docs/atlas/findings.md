@@ -14,7 +14,7 @@ Across the 16 sweep reports, approximately 170 candidate findings were evaluated
 
 | Rank | ID | Finding and significance |
 | :--- | :--- | :--- |
-| 1 | T1 | TaskFeeder `'worker_remove'` vs `'worker_removed'` event mismatch. TaskActions accumulate on workers across job changes, causing long-session slowdown and logic issues. |
+| 1 | T1 | TaskFeeder `'worker_remove'` vs `'worker_removed'` event mismatch. TaskActions accumulate on workers across job changes. The retention is measured. A CPU effect over two game days was not measurable (experiment 002). |
 | 2 | E1 | ACE placement tasks not decremented in `_unrequest_placement_task`. Placement task entries remain for the session. |
 | 3 | E2 | ACE evolve double season listener registration. Listener growth on `stonehearth.seasons` for entities with seasonal evolution. |
 | 4 | B1 | `fabricate_chunk` 2.5 s realtime item-finder restart per builder when idle. Steady-state CPU cost continues while paused. |
@@ -43,7 +43,7 @@ Static analysis and instrumentation focus on several recurring implementation an
 
 ### 1. Radiant core
 
-Research report: [docs/research/agy-sweep/01-radiant-core.md](../research/agy-sweep/01-radiant-core.md)
+Research report: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -57,9 +57,9 @@ Research report: [docs/research/agy-sweep/01-radiant-core.md](../research/agy-sw
 ### 2. AI framework and actions
 
 Research reports:
-- Slice 3: [docs/research/agy-sweep/03-ai-framework-tasks.md](../research/agy-sweep/03-ai-framework-tasks.md)
-- Slice 4: [docs/research/agy-sweep/04-ai-actions-a-l.md](../research/agy-sweep/04-ai-actions-a-l.md)
-- Slice 5: [docs/research/agy-sweep/05-ai-actions-m-z.md](../research/agy-sweep/05-ai-actions-m-z.md)
+- Slice 3: unpublished notes
+- Slice 4: unpublished notes
+- Slice 5: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -74,14 +74,14 @@ Research reports:
 | K4 | Patrol route evaluation creates transient entities, logger created per think (storage search, harvest, follow), realtime timer + strings per path search, idle WeightedSet rebuilt per bored cycle, collect_ingredient async event leak, leases leaked when crafting progress fails, chase re-pathing with up to 10 direct pathfinders | see agy report `20261027-022032-a5431a` | Worker claim | Low-Med |
 | A1 | Each citizen's equipment-upgrade action listens to the equipment tracker and rescans all equipment on think start, job change and level-up | `ai/actions/upgrade_equipment/find_equipment_upgrade_action.lua:15-55` | VALID | Med (the worker claimed High, additions are infrequent) |
 | A2 | `place_item_type_on_structure_2` polls with a realtime restart timer and drops its change listener at think output | `ai/actions/place_item_type_on_structure_2.lua:84-141,158` | VALID | Med (idle workers with placement tasks) |
-| A2b | Town placement requests outlive their ghosts: `GhostFormComponent:_add_to_town` requests a placement task for every placeable item type, but `_remove_from_town` unrequests only inside the `_limited_registration_tag` block, so an entry stays (count never back to zero) unless the item has a placement limit. `place_item_type_on_structure_2` then keeps cycling through stale types, each try holding a worker for up to the 5 s realtime failsafe. ACE's version keeps the same nesting, and in addition its release lookup uses a different key than its request (E1) | `components/ghost_form/ghost_form_component.lua:139-148,175-183`, `services/server/town/town.lua:603-631` | VALID (checked 2026-10-28); confirmed by census 2026-10-29: in vanilla (stock and defaults) and ACE every town ends with all 16 of its placement entries stale (64 in 4 towns, counts never back to zero, 0 live ghosts) | Med-High for construction: each stale type holds a placement worker up to 5 s realtime per pass (at the benchmark's top speed about 12 game minutes), fix next |
+| A2b | Town placement requests outlive their ghosts: `GhostFormComponent:_add_to_town` requests a placement task for every placeable item type, but `_remove_from_town` unrequests only inside the `_limited_registration_tag` block, so an entry stays (count never back to zero) unless the item has a placement limit. `place_item_type_on_structure_2` then keeps cycling through stale types, each try holding a worker for up to the 5 s realtime failsafe. ACE's version keeps the same nesting, and in addition its release lookup uses a different key than its request (E1) | `components/ghost_form/ghost_form_component.lua:139-148,175-183`, `services/server/town/town.lua:603-631` | VALID (checked 2026-10-28), confirmed by census 2026-10-29: in vanilla (stock and defaults) and ACE every town ends with all 16 of its placement entries stale (64 in 4 towns, counts never back to zero, 0 live ghosts) | Med-High for construction: each stale type holds a placement worker up to 5 s realtime per pass (at the benchmark's top speed about 12 game minutes), fixed by the placement release patches (experiment 005) |
 | A3 | Synchronous pathfinder `search_until_travelled` inside think while choosing extra backpack items | `ai/actions/put_another_restockable_item_into_backpack_action.lua:163-213` | VALID | Med (blocks the tick, bounded by range) |
 | A4 | Restock storage think allocates closures and strings, `run_effect` builds a debug string per effect, `dig_adjacent` fires an autotest-only `mined_location` event per block | `restock_storage_action.lua:61-80`, `run_effect_action.lua:55`, `mining/dig_adjacent_action.lua:101` | VALID (`run_effect`, `dig_adjacent` checked) | Low-Med (GC churn) |
 | A5 | Combat: idle shuffle spatial queries, per-voxel targetable raycasts on the target trace, 1 s cooldown polling, formation per-step speed recalculation, pet friend scan O(pets x H), siege repair component query per candidate | `combat/*`, `walk_in_formation_action.lua`, `pet/check_out_random_friend_action.lua`, `repair_entity_action.lua` | Worker claim (combat-only or niche) | Low-Med |
 
 ### 3. Inventory and storage
 
-Research report: [docs/research/agy-sweep/02-inventory-storage-restock.md](../research/agy-sweep/02-inventory-storage-restock.md)
+Research report: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -104,7 +104,7 @@ Research report: [docs/research/agy-sweep/02-inventory-storage-restock.md](../re
 
 ### 4. Hearthling needs
 
-Research report: [docs/research/agy-sweep/07-hearthling-needs.md](../research/agy-sweep/07-hearthling-needs.md)
+Research report: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -124,7 +124,7 @@ Research report: [docs/research/agy-sweep/07-hearthling-needs.md](../research/ag
 
 ### 5. World, plants, water, terrain
 
-Research report: [docs/research/agy-sweep/08-world-plants-water.md](../research/agy-sweep/08-world-plants-water.md)
+Research report: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -149,7 +149,7 @@ Research report: [docs/research/agy-sweep/08-world-plants-water.md](../research/
 
 ### 6. Building and construction
 
-Research report: [docs/research/agy-sweep/09-building.md](../research/agy-sweep/09-building.md)
+Research report: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -162,7 +162,7 @@ Legacy (v1) build components only run for legacy saves and templates. The ladder
 
 ### 7. Combat and sensing
 
-Research report: [docs/research/agy-sweep/06-observers-pathing-combat.md](../research/agy-sweep/06-observers-pathing-combat.md)
+Research report: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -191,7 +191,7 @@ Research report: [docs/research/agy-sweep/06-observers-pathing-combat.md](../res
 
 ### 8. Colony, crafting, services
 
-Research report: [docs/research/agy-sweep/16-colony-crafting.md](../research/agy-sweep/16-colony-crafting.md)
+Research report: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -204,7 +204,7 @@ Research report: [docs/research/agy-sweep/16-colony-crafting.md](../research/agy
 
 ### 9. DLC mods and game master
 
-Research report: [docs/research/agy-sweep/15-dlc-game-master.md](../research/agy-sweep/15-dlc-game-master.md)
+Research report: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -218,9 +218,9 @@ Research report: [docs/research/agy-sweep/15-dlc-game-master.md](../research/agy
 ### 10. Client and UI
 
 Research reports:
-- Slice 10: [docs/research/agy-sweep/10-client-lua-renderers.md](../research/agy-sweep/10-client-lua-renderers.md)
-- Slice 11: [docs/research/agy-sweep/11-ui-javascript.md](../research/agy-sweep/11-ui-javascript.md)
-- Slice 14: [docs/research/agy-sweep/14-ace-ui-client.md](../research/agy-sweep/14-ace-ui-client.md)
+- Slice 10: unpublished notes
+- Slice 11: unpublished notes
+- Slice 14: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
@@ -243,13 +243,13 @@ Research reports:
 ### 11. ACE
 
 Research reports:
-- Slice 12: [docs/research/agy-sweep/12-ace-server-patches.md](../research/agy-sweep/12-ace-server-patches.md)
-- Slice 13: [docs/research/agy-sweep/13-ace-additions.md](../research/agy-sweep/13-ace-additions.md)
+- Slice 12: unpublished notes
+- Slice 13: unpublished notes
 
 | ID | Finding | Location | Verdict | Impact |
 | :--- | :--- | :--- | :--- | :--- |
 | E1 | `_request_placement_task` stores entries under `tasks[tag][key]`, but `_unrequest_placement_task` reads `tasks[key]`. Placement task counts therefore do not decrease, so placement tasks remain for the session, and placement AI keeps acting on them. | `stonehearth_ace/monkey_patches/ace_town.lua:1098-1145` | VALID (functional issue + perf) | High for ACE |
-| E2 | `AceEvolveComponent:activate` calls `_create_listeners()` twice (else-branch and again under `if self._evolve_data`), so the first season listener reference is overwritten and the listener remains active. This applies to evolve entities with `evolve_data.seasons` (about 165 ACE entity JSON files): each such evolution leaves an active listener on `stonehearth.seasons`. | `ace_evolve_component.lua:52,65,90-97` | VALID (scope narrowed by Codex review) | Med-High for ACE in long sessions |
+| E2 | `AceEvolveComponent:activate` calls `_create_listeners()` twice (else-branch and again under `if self._evolve_data`), so the first season listener reference is overwritten and the listener remains active. This applies to evolve entities with `evolve_data.seasons` (about 165 ACE entity JSON files): each such evolution leaves an active listener on `stonehearth.seasons`. | `ace_evolve_component.lua:52,65,90-97` | VALID (scope narrowed by Codex review) | Low (runtime impact unmeasured, see `docs/ace-notes.md`) |
 | E3 | Farm sunlight check interval with raycasts per field | `ace_farmer_field_component.lua:757-839` | Worker claim (period is 3h per atlas) | Low-Med |
 | E4 | Stockpile `notify_restock_finished` does a point spatial query per restocked item | `ace_stockpile_component.lua:3-15` | VALID | Low |
 | E5 | Medic observer listener retention, JSON read and closures in crafter drop, recursive hierarchy walk on vertical waypoints | `ace_find_healable_target_observer.lua:6-10`, `ace_wait_for_closest_storage_space.lua`, `ace_follow_path_action.lua:64-86` | Worker claim | Low-Med |
@@ -272,13 +272,13 @@ Seen in the XL benchmark logs (`runs/`, local only) and traced to the source cod
 | RT2 | `find_reachable_entity_type_anywhere` runs a ground finder and a storage finder in parallel. Both call `ai:set_think_output({})` on every success and neither stops itself or the other, so the engine logs `duplicate "set_think_output" in state ready` and ignores the call while both searches keep running. ACE overrides the file with the same pattern. | `ai/actions/find_reachable_entity_type_anywhere.lua:158-209`, `stonehearth_ace/ai/actions/find_reachable_entity_type_anywhere.lua` | OBSERVED: 1,904 to 4,733 duplicates per complete vanilla XL run (1 game hour of warm-up plus 1 game day). ACE runs log no `ai.execution_unit` lines at all, so their zero count says nothing about ACE. | Low-Med (wasted searches plus one log line each). Candidate fix: destroy both finders on the first success. |
 | RT3 | Under ACE the native job list runs passes of up to 25 s (`simulation.core`: `took N ms to process job list`): 57 passes and 642 s before the window of run `ace-bisect-farm` (the 1 game hour warm-up took 11 minutes against 13 s for vanilla) and 188 s inside its 441 s window. Root cause: ACE's `BlueprintsToBuildingPiecesJob:clone_nav_grid` builds each building plan's private nav grid from the terrain inside the plan bounds plus the full region of every completed building in the world, for every player (`stonehearth.building:get_buildings()`), and adds each of those regions twice. Outside the bounds there is no terrain, so those regions do not affect the topology the plan queries, but the engine processes their collision across the map inside one job step without yielding. | `stonehearth_ace/monkey_patches/ace_blueprints_to_building_pieces_job.lua:348-415` | CONFIRMED by measurement: (1) with `logging.simulation.core.log_level=7` the 25 s fall between "processing job list" and "done processing job list"; (2) the Lua profiler sees only 4.5 samples per second during the stall against 271 for vanilla, so the time is native; (3) without the buildings under construction ACE's warm-up takes 14.6 s and its window 260.0 s, vanilla level; (4) clipping each building region to the plan bounds (`steady_hearth` patch `ace_plan_navgrid_clip`) cuts the warm-up from about 11 minutes to 15.4 s and the long passes from 642 s to 5.9 s | High for ACE: this accounts for most of the extra time with ACE, and it grows with the number of finished buildings |
 | RT4 | ACE's farmer field renderer computes `data.rotation * 90` without a default, so a field created through the base 3-argument `create_new_field(session, location, size)` stops the client renderer from displaying that field. The ACE UI always passes a rotation. | `stonehearth_ace/monkey_patches/ace_farmer_field_renderer.lua:54`, `ace_farming_service.lua:23` | OBSERVED | Low (scripted field creation only). The benchmark passes `(nil, 0)`. |
-| RT5 | ACE `titles_component.lua:143` compares a nil client setting with a number for players without a connected client. Recorded as X7 in [ace.md](ace.md). | `stonehearth_ace/components/titles/titles_component.lua:143` | OBSERVED | Fails every ACE XL autotest with exit code 1 |
+| RT5 | ACE `titles_component.lua:143` compares a nil client setting with a number for players without a connected client. Recorded as X7 in [the ACE notes](../ace-notes.md). | `stonehearth_ace/components/titles/titles_component.lua:143` | OBSERVED | Fails every ACE XL autotest with exit code 1 |
 | RT6 | The building monitor's 30 s slow-progress check calls `get_world_region` on every scaffolding chunk entity of the active plan node without checking that it still exists, so once a scaffolding chunk is destroyed the check raises `entities.lua:21: attempt to index a nil value` and the unreachable-region update is skipped for that cycle | `stonehearth/components/building2/plan/nodes/new_chunk_node.lua:203-205`, called from `building_monitor.lua:189` | OBSERVED in 5 ACE runs, patched and unpatched; not seen in vanilla runs | Low-Med. The monitor re-arms its timer only at the end of `_on_building_progress_slow`, so after this error it never runs again for that building and the player gets no unreachable-work warning. Fixed by `steady_hearth` patch `base_chunk_node_working_regions` (default on, validated 2026-10-27: no RT6 error in an ACE and a vanilla game day with the patch installed) |
 | RT7 | `CraftOrderList:post_activate` listens on `stonehearth.inventory:get_inventory(player_id)` without checking for nil. For a player without an inventory the C++ event manager accepts the nil sender and the listeners never fire; Lua events mode asserts | `stonehearth/components/workshop/craft_order_list.lua:40-46` | OBSERVED (ACE world generation fails with `mods.radiant.use_cpp_events=false`) | Low |
 | RT8 | `EntityFormsComponent:destroy` triggers `stonehearth:entity_forms:children_changed` on `self._parent` even when it is nil (accepted by the C++ event manager, asserts in Lua events mode). Reached when a job change drops equipment | `stonehearth/components/entity_forms/entity_forms_component.lua:95` | OBSERVED (census run with job churn) | Low |
 | RT9 | A job change while a hearthling is suspended in `RunEffectTimedAction` raises `CHECK failed: execution_frame.cpp:200` | `stonehearth/ai/actions/run_effect_timed_action.lua:42` | OBSERVED once (census run with job churn, 120 job changes) | Low; engine-level, needs a reproduction before any change |
 | RT10 | Many AI actions pace their retries and failsafes with realtime timers (2 to 5 s), for example ACE's `build_item_type_on_structure` (2 s restart, 5 s failsafe per requested item type) and the fabrication actions. Their cost in game time grows with game speed: at the hidden speed 4 under XL load each wait is 10 to 28 game minutes, and ACE builders sit idle with reachable, supplied work | `stonehearth_ace/ai/actions/build_item_type_on_structure.lua:8-9,120-160`, `fabricate_chunk_action.lua:11-12` (base and ACE) | CONFIRMED: ACE XL at speed 4 finished 0 to 2 of 4 cottages in 72 game hours; at speed 1 all 4 by game hour 19 and both blacksmith houses on their last step by hour 37 | Gameplay at high speed; the benchmark now runs at speed 2 (`docs/harness/bench.md`). A fix would pace these waits in game time |
-| RT11 | No AI behaviour lets a hearthling stranded above or below the ground (on a roof after ladders and scaffolding come down, in a dig site) find its own way back; the pathfinder correctly reports no path, and nothing builds an escape ladder | no `unstuck` or escape action in base or ACE AI | OBSERVED: 7 rescues in a 37-game-hour ACE run (mostly miners, one builder); the owner saw hearthlings stuck on top of buildings | Gameplay; the benchmark watchdog rescues stranded citizens after 2 game hours. Root cause of the roof cases (ladder or scaffolding teardown with workers above) is being measured |
+| RT11 | No AI behaviour lets a hearthling stranded above or below the ground (on a roof after ladders and scaffolding come down, in a dig site) find its own way back; the pathfinder correctly reports no path, and nothing builds an escape ladder | no `unstuck` or escape action in base or ACE AI | OBSERVED: 7 rescues in a 37-game-hour ACE run (mostly miners, one builder), and hearthlings were seen stuck on top of buildings | Gameplay; the benchmark watchdog rescues stranded citizens after 2 game hours. Root cause of the roof cases (ladder or scaffolding teardown with workers above) is being measured |
 
 ## Static lint candidates (2026-10-27)
 

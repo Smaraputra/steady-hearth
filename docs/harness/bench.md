@@ -5,7 +5,7 @@
 Benchmarks run as autotests with a client attached:
 - the `autotest_framework` and `stonehearth_autotest` mods are enabled.
 - the `perf_bench` mod adds the `perf_bench_flat` world and the `perf_bench` group through a mixinto of `stonehearth_autotest/tests/index.json`.
-- each run builds a fresh flat 256 x 256 world and a deterministic colony, then measures a fixed workload.
+- each run builds a fresh world (S and M: flat 256 x 256, XL: the 512 x 512 map of scenario xl-v4) and a deterministic colony, then measures a fixed workload.
 
 Two other vehicles were rejected:
 
@@ -46,17 +46,40 @@ Consequences:
 
 ### XL: fixed-time 4-player late game (`mods/perf_bench/tests/bench_xl.lua`)
 
-A 512 x 512 flat world with 4 player towns, one per quadrant: player_1 Ascendancy, player_2 Rayya's Children, player_3 Northern Alliance, player_4 Ascendancy.
+A 512 x 512 world with 4 player towns, one per quadrant: player_1 Ascendancy, player_2 Rayya's Children, player_3 Northern Alliance, player_4 Ascendancy.
+
+#### Scenario xl-v4 (since 2026-10-29)
+
+Every coordinate comes from `mods/perf_bench/tests/bench_map.lua`, a pure Lua module that the world generator (`bench_world_large.lua`) and the scenario share, so terrain and placement cannot disagree. It runs outside the game too, which is how the terrain and layout were checked before the first run.
+
+- Terrain: two ridges cross at the map centre (north-south at |x| <= 10, east-west at |z| <= 10), 10 voxels above the plain in 5 terraces with 2-voxel risers, which hearthlings cannot climb (the walking step is 1 voxel). Each ridge arm has a pass halfway between two towns: a staircase 5 wide with a 1-voxel rise per tread on both faces, up to a flat crest 13 wide.
+- Water: one lake per town at `cx + 36 .. cx + 48`, `cz - 36 .. cz - 26`, its floor stepping 9, 8, 7 so anyone in it can climb out, filled at world generation with `create_water_body_with_region` to y 9.5. A non-integer level does not evaporate while unchanged. The lakes stay 2 or more voxels from the farms, so ACE's farm water signals are not exercised.
+- Wild trees: 300 (small and medium oaks, 2 to 1), scattered by a fixed-seed Park-Miller generator outside the towns, each on level ground under its whole footprint with a free voxel around it: on the ridge crests, the foothills, the corridors and the margins. Each town harvests 15 trees of its own forest and the 5 crest trees nearest to it, which its workers reach only through a pass. 40 rabbits scatter the same way.
+- Supplies for each building under construction lie in one packed yard south of the building grid (`cz + 86`, 20 wide, sorted by kind, 1 free cell between kinds).
+- The carpenter house's input shelves get the filter a player would give them (wood). Unfiltered, the base game marks them with an attention icon and they accept nothing.
+- Goblin raids appear on open ground at `cx + 52`, `cz - 10`, outside every building and within the goblins' 64-voxel sight of the citizens. The goblins get no orders: they engage what they see.
+
+Comparability: absolute numbers from xl-v4 and the earlier scenario (v3) are not comparable. Every A/B pair before 2026-10-29 15:28 ran both arms on v3, so those deltas stand. v3 had two bugs that v4 fixes: the north-south wild tree band reached z = 352 on a map that ends at 255 (24 trees were clamped onto one spot at the edge), and the supply piles of the blacksmith house stepped 16 voxels per kind, so in towns 2 and 4 the last 8 (vanilla) or 11 (ACE) kinds were created past the map edge and clamped, and in towns 1 and 3 they reached the other towns' piles. v3 also put the raid spawn inside the building grid and a dining table half a voxel into a chair.
+
+Checks every run logs: `setup` (`scenario`, `out_of_bounds`, `layout_fp`, `trees_moved`, `crest_trees`), `shelves` (filtered shelves and storages still showing the attention icon, expected 0), `connectivity` at the window start (lake bottom, crest and the far side of each neighbouring pass against open ground at the town centre; any `no` is a validation failure), one `layout` line per feature for `tools/bench_layout.py`, `raid_engaged` (game seconds until a goblin first has a target), and in `kpi` lines `crest_cut`, `swimming`, `crafted_window` (per recipe, since the window start), `orders` (each crafter order: enabled, crafting, ingredients, due) and in `kpi_global` the water bodies and their levels.
+
+Reference runs of 2026-10-29 (Steady Hearth 1.1.0 defaults, CPU profiler on, so not timing-valid): vanilla `20261029-152845` and ACE `20261029-153953`. Both: 0 script errors, 0 out-of-bounds, 0 trees moved, 8 of 8 shelves filtered with no icon left, every crest harvest done (5 of 5 per town), lakes at 9.50 throughout, both raids engaged (56 and 100 game s), every mine dug out. Busy time of the game day (`busy_window_s`): vanilla 497.6 s, ACE 501.4 s. Earlier v3 profiles for context: vanilla 423.0 s (`20261029-081900`, which also had R3 on, so the difference is not the map alone) and ACE 481.8 s (`20261029-101805`, the same defaults). Hauled items stored per town: vanilla 10 to 64 of 150, ACE 95 to 135 (v3 vanilla 37 to 121). The layout fingerprint covers the features both variants place identically; buildings, supply yards and the bed, seat and table top-ups depend on templates and costs, which ACE changes (fingerprint scope fixed after these two runs).
+
+Known ACE workload difference: in the measured window the vanilla crafters made 14 or 15 items per town (the maintain orders refill tables, chairs, stone chairs and copper ingots all day), the ACE crafters 4 or 5. At the window start the ACE carpenter, blacksmith and weaver lists hold only orders that the building system queued for the fixtures of the buildings under construction and their ingredient chains (beds, chests, windows, doors, tin and iron ingots, cloth, leather), most without ingredients, and the scenario's own maintain orders are no longer in those lists. Vanilla queues fixture orders as well but keeps the maintain orders. Supplying something would not change this, so it is recorded as a difference between the variants rather than fixed in the scenario.
+
+#### Earlier versions
+
+The town layout below is unchanged in v4 except where the v4 section says otherwise.
 
 Each town:
 - 28 citizens: 20 workers, 4 footmen, and 4 crafters (carpenter, mason, blacksmith, weaver) with maintain orders.
 - 11 template buildings: 9 finished with `instabuild` (4 shared sleeping quarters, 2 cottages for two, herbalist house, dining hall, carpenter house) and 2 under live construction (blacksmith house, tiny cottage). Each building under construction gets its own supply piles computed from the game's own cost (`get_costs`) and resource constants (`stonehearth:data:resource_constants`, which ACE extends with planks, stone blocks and thatch): resource items for every material (voxels times 1.1 divided by the voxels per item, plus 2) and every fixture and furniture item. A `costs` line logs what was needed and supplied. In vanilla the tiny cottages finish after 21 to 27 game hours and the blacksmith houses after about 2.5 game days.
 - One bed per citizen and at least one seat per two citizens. Beds and seats are topped up beyond what the templates provide.
 - 16 full stone chests (64 items each), 8 empty chests, 2 stockpiles, 150 loose items to haul and 60 food baskets.
-- Two dig sites (a 12 x 12 x 4 hill and a 10 x 10 x 3 pit), a 10 x 10 carrot farm, and a 40-tree forest with 20 trees requested for harvest.
+- Two dig sites (a 12 x 12 x 4 hill and a 10 x 10 x 3 pit), a 10 x 10 carrot farm, and a 40-tree forest with 20 trees requested for harvest (v4: 15 in the forest and 5 on the ridge crest).
 
 Map-wide:
-- 300 wild trees and 40 rabbits.
+- 300 wild trees and 40 rabbits (v3: two straight bands along the map's centre lines, v4: scattered, see above).
 - Goblin raids of 2 swordsmen on one town at a time, in rotation every 9 game hours, so each town is raided about every 36 game hours (calendar-timed). The vanilla goblin and ambient threat campaigns wait a day or more between encounters with parties of 1 to 3 per unit type. Before 2026-10-27 21:20 every town was raided every 6 hours by 3 goblins (48 goblins per game day); results before that date use the old scenario and are not comparable.
 
 Totals at setup: 112 citizens, 44 buildings, about 9,900 entities, a Lua heap of about 150 MB.
@@ -67,12 +90,12 @@ A stuck watchdog acts as a player would, as a last resort. Every 30 game minutes
 - unsticks citizens inside geometry, using the engine's own `physics:unstick_entity`.
 - returns to the banner any idle citizen that has not moved for 3 game hours, which leaves the AI time to build ladders or dig out.
 
-- returns to the banner a citizen that stands more than 2 voxels above the terrain with no path to open ground at the town centre for 4 consecutive checks (2 game hours), which catches hearthlings stranded on roofs that keep moving and so escape the stillness rule (added 2026-10-28 after the owner saw hearthlings stuck on top of buildings).
+- returns to the banner a citizen that stands more than 2 voxels above the terrain with no path to open ground at the town centre for 4 consecutive checks (2 game hours), which catches hearthlings stranded on roofs that keep moving and so escape the stillness rule (added 2026-10-28 after hearthlings were seen stuck on top of buildings).
 
 Sleeping, seated, incapacitated and fighting citizens are never moved, and citizens at a workshop are not counted as stranded (topology queries give false negatives there). Rescues (with their reason), unsticks and the number of currently stranded citizens are KPIs.
 
-Measurement: one game hour of warm-up, then one game day (86,400 game s) at speed 4.
-- `done.window_real_s` is the primary metric.
+Measurement: one game hour of warm-up, then one game day (86,400 game s) at speed 2 (speed 4 before 2026-10-28).
+- The primary metric is busy time (`busy_window_s`, see "Game speed and the busy-time metric"). `done.window_real_s` was the primary metric before 2026-10-28.
 - `sample.speed` gives the realized speed over time.
 - Per-player `kpi` lines at window start and end are behaviour checks: citizens, items stored out of 150, trees cut, blocks mined, crafts, deaths, rescues, unsticks, beds, chairs and tables.
 - `kpi_global` records raids and goblins killed.
@@ -181,12 +204,12 @@ Resuming after an interruption or a shutdown:
 
 1. `git status`: finish or revert any uncommitted edit before anything runs (the plan runner refuses dirty `mods/` anyway).
 2. `tools/queue.py <plan> --check` lists each entry as complete, running or pending, with the interrupted attempts. If `runs/.priority` exists but no plan runs with `--priority`, remove it (left by an interrupted priority plan). Relaunch the plans in the background, a priority plan with `--priority`: `python3 tools/queue.py runs/queues/<name>.plan >> runs/queues/<name>.log 2>&1`. A plan is read again before every run, so work can be inserted into a running plan by editing its file, or run ahead of it as a separate plan with `--priority`.
-3. Read `result.txt` and `errors.txt` of every run finished since the last journal entry (status 125 is a stalled game) and record them in the journal. Runs marked `interrupted.txt` are never used in results, and partial data from them is labelled as partial.
+3. Read `result.txt` and `errors.txt` of every run finished since the last recorded result (status 125 is a stalled game) and record them. Runs marked `interrupted.txt` are never used in results, and partial data from them is labelled as partial.
 4. Restart `tools/watch_errors.py` in the background.
 
-Machine load: `tools/run_game.sh` samples the 1-minute load average every 30 s and records the highest value and the core count (`load_max`, `cores`) in `result.txt`; `tools/parse_bench.py` marks a run `contended` when `load_max` exceeds the core count (12 on this M4 Pro), and contended runs are not timing-valid. Timing plan entries carry `RUN_TIMING=1`, which makes `run_game.sh` wait, without holding the lock, until the 5-minute load average is at most the core count (up to `RUN_QUIET_WAIT_S`, default 3 hours). On 2026-10-28 from about 10:20 the 1-minute load was 30 to 50 (the macOS security daemon `secd` at 134% CPU and several Chrome processes), and ACE diagnostic runs that took about 480 s of busy time at night took 628 to 760 s. Runs before 10:55 that day carry no load record; all timing results so far come from night runs.
+Machine load: `tools/run_game.sh` samples the 1-minute load average every 30 s and records the highest value and the core count (`load_max`, `cores`) in `result.txt`; `tools/parse_bench.py` marks a run `contended` when `load_max` exceeds the core count (12 on this M4 Pro), and contended runs are not timing-valid. Timing plan entries carry `RUN_TIMING=1`, which makes `run_game.sh` wait, without holding the lock, until the 5-minute load average is at most the core count (up to `RUN_QUIET_WAIT_S`, default 3 hours). On 2026-10-28 from about 10:20 the 1-minute load was 30 to 50 (other processes on the host), and ACE diagnostic runs that took about 480 s of busy time at night took 628 to 760 s. Runs before 10:55 that day carry no load record, and the timing results in this document come from runs on a quiet host.
 
-`tools/parse_bench.py` reports `timing_valid`: the run wrote its `done` line, `slept_s` is at most 1, the CPU profiler was not active, the run was not interrupted, and it was not contended. Only such runs enter results tables. The XL runs in the table above predate the `slept_s` field. The system power log (`pmset -g log`) shows no sleep during any of them (sleeps at 14:52 to 14:55 and from 16:22 on).
+`tools/parse_bench.py` reports `timing_valid`: the run wrote its `done` line, `slept_s` is at most 1, the CPU profiler was not active, the run was not interrupted, and it was not contended. Only such runs enter results tables. The XL runs in the table above predate the `slept_s` field. The system power log (`pmset -g log`) shows no sleep during any of them.
 
 ## CPU profiles (diagnostic runs only)
 
@@ -210,9 +233,9 @@ While runs are under way, `tools/watch_errors.py` follows the live log and stops
 
 | Error | Seen in | Classification |
 | :--- | :--- | :--- |
-| ACE `titles_component.lua:143` nil comparison | every ACE run | ACE issue X7, which causes exit code 1 in every ACE XL run |
+| ACE `titles_component.lua:143` nil comparison | every ACE run without the X7 fix (on by default since 1.0.0) | ACE issue X7, which caused exit code 1 in every ACE XL run before the fix |
 | `compound_action.cpp:151` CHECK in `fabricate_chunk` (vanilla line 73, ACE line 75), followed by a native "c++ exception" line and sometimes by `placeholder ... __call.path_length` or `__call.chunk failed to return a value in "compound: fabricate chunk"` (`find_path_to_reachable_entity.lua:69`), because the aborted think leaves a placeholder of the compound action unset | runs without `steady_hearth` only: 2 of 3 complete unpatched vanilla XL runs of the current scenario before 2026-10-28, and the A/A control `s2-aa1r`; none in runs with the `fabricate_single_output` patches | base issue RT1 (ACE carries the same code), addressed by `base_fabricate_single_output` and `ace_fabricate_single_output` (`docs/experiments/002-lua-ai-fixes.md`). Expected in unpatched control runs |
-| `entities.lua:21` nil in `get_world_region` from the building monitor | ACE runs with construction, patched or not | base issue RT6 |
+| `entities.lua:21` nil in `get_world_region` from the building monitor | ACE runs with construction before the RT6 fix (on by default since 1.0.0) | base issue RT6 |
 | ACE farm renderer nil `rotation` | 2 early ACE runs | harness-caused (RT4), fixed in the benchmark |
 | `events.lua:140` and `events.lua:310` assertions, ACE world generation failure | census runs with `mods.radiant.use_cpp_events=false` | the Lua event manager rejects nil senders that the C++ one accepts (RT7, RT8). Lua events mode is therefore vanilla-only (ACE world generation fails before `perf_census` starts; the census only logs a warning in that combination). Since 2026-10-28 13:52 the census guards `trigger` and `trigger_async` against nil senders on server and client (`mods/perf_census/nil_sender_guard.lua`), matching the C++ manager: the first job-churn run with C++ events (`20261028-133458-...-pchurn-time-t1c-r1`, 360 job changes) logged no error at the RT8 site, so RT8 was an artefact of the census mode only. Verified in `20261028-143553-...-census-churn-t1c-r5`: `nil_sender_guard=true` on server and client, no RT8 (every earlier census run had 4), census complete. With job churn, RT8 fires when `demote` destroys the old job's equipment (`job_component.lua:868`): the native `destroy_entity` catches the error ("c++ exception: lua runtime error") and the job change completes (the churn driver reports every change), but the rest of that item's `EntityFormsComponent:destroy` is skipped, so a few of its traces remain. Both arms of a census comparison carry it equally |
 | `execution_frame.cpp:200` CHECK, "bad frame transition to remove_action from starting_thinking" on the `stonehearth:patrol` frame (first Lua frame `run_effect_timed_action` or `follow_path_action`, wherever the footman was suspended) | census runs with job churn, with T1 off (unpatched census, `census-churn-t1off`) and on | RT9, triggered by the churn driver demoting a footman mid-patrol, independent of T1. This occurs only with `churn_mode=direct` (job changes from a timer, mid-action), whereas player-style churn runs, where the citizen's own AI changes the job, show none |

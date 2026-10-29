@@ -21,20 +21,20 @@ Performance and stability fixes for Stonehearth 1.1, in one small mod. It works 
 
 ## What it fixes
 
-The mod patches the game's Lua code at load time. Each patch first checks that the code it replaces is exactly the version it was written for and leaves the original alone otherwise, so a game or ACE update switches a patch off instead of breaking your game.
+The mod patches the game's Lua code at load time. Each patch first checks that the function it replaces comes from the expected source file and line range, and leaves the original alone otherwise, so an update that moves or replaces that code switches the patch off. The check cannot catch a change that keeps the same lines, so it lowers the risk from future updates without ruling it out.
 
 | Fix | Applies to | Problem | Measured effect |
 | :--- | :--- | :--- | :--- |
 | Restock search caches (R7, R7b) | ACE | Each restock errand creates a new native search cache that the engine keeps for the session, so restock searches can take longer as the session continues | Busy time over two game days **-26.7%** (1,039 s to 762 s, one run pair); median restock search 0 to 11 game seconds instead of 22 to 578; about **twice the construction** per game day |
 | Building plan nav grids (E8) | ACE | Each building plan adds every finished building in the world to its private nav grid, causing pauses of 10 to 25 s at a time while plans are made | Early-game pauses **about 13 minutes to under 10 seconds** per run; identical plans |
-| Building plan freeze (E9) | ACE | Plans clone their nav grid with uninitialized bounds, which can cause multi-minute pauses in about one game in ten | **No pause**; every clone takes 0 to 1 ms |
+| Building plan freeze (E9) | ACE | Plans clone their nav grid with uninitialized bounds, which caused multi-minute pauses in about one in ten of our ACE benchmark runs | **No pause** in the validation runs: all 16 clones took 0 to 1 ms |
 | Search early exit (RT1, RT2) | Base game and ACE | Item searches keep running after their answer is known; orphaned timers cause engine CHECK failures | Base game busy time **-2.3%** (p 0.009), job-list time **-8.0%** (p 0.004); duplicate AI decisions 5,000 to 12,000 per game day to 0 |
 | Lease release fan-out | Base game and ACE | Every path search listens to every item lease release in the town | Lua time in path-search code **7.2% to 1.5%** of all Lua samples |
 | Harvest need ratings | Base game and ACE | Harvest actions rate every candidate tree or bush by checking every combination of its material tags against the town's requests | Share of Lua time in this code **10.1% to 0.3%** (ACE benchmark); identical results, checked call by call |
 | Stale placement requests (E1, A2b) | Base game and ACE | Placement requests stay in town tables after placement, so workers keep checking placed items (5 s each) | Stale requests after two game days **64 to 0** |
 | Script errors (RT6, X7) | Base game / ACE | A building-monitor error and an ACE titles error in multiplayer towns | Errors gone |
 
-Measured on the project's benchmark: an XL scenario with 4 player towns of 28 hearthlings each, at game speed 2, under Wine on an Apple M4 Pro. The numbers compare runs with and without each fix on the same machine; your own frame rates will differ. Method, raw numbers and caveats for every row are in [`docs/experiments/`](docs/experiments/).
+Measured on the project's benchmark: an XL scenario with 4 player towns of 28 hearthlings each, at game speed 2, under Wine on an Apple M4 Pro. The numbers compare runs with and without each fix on the same machine, and your own frame rates will differ. Method, raw numbers and caveats for every row are in [`docs/experiments/`](docs/experiments/). These rows were measured on the flat map of scenario v3. Scenario xl-v4 (2026-10-29) adds two ridges with stepped passes, a lake beside every town and scattered wild trees, and its first profiles are in [`docs/atlas/profiles-2026-10-28.md`](docs/atlas/profiles-2026-10-28.md).
 
 ## Install
 
@@ -85,7 +85,7 @@ Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) w
 
 ## How this was made
 
-This project was built with AI assistance throughout. Anthropic's Claude (through Claude Code) did most of the code analysis, wrote the patches and the benchmark harness, ran and evaluated the test runs, and found most of the issues listed above; OpenAI's Codex reviewed every non-trivial patch independently; Google's Gemini (through Antigravity) did background web research. A human maintainer directed the work and made every decision about what ships. Each finding was checked against the game's own code and confirmed in game runs before a fix was turned on, and every result above links to its raw numbers, so the claims can be checked rather than trusted.
+This project was built with AI assistance throughout. Anthropic's Claude (through Claude Code) did most of the code analysis, wrote the patches and the benchmark harness, ran and evaluated the test runs, and found most of the issues listed above; OpenAI's Codex reviewed every non-trivial patch independently; Google's Gemini (through Antigravity) did background web research. A human maintainer directed the work and made every decision about what ships. Each finding was checked against the game's own code and confirmed in game runs before a fix was turned on, and every result above links to an experiment document with its method, per-run measurements and limitations. Full run output and internal review notes are not published.
 
 ## Replicating the measurements
 
@@ -94,10 +94,10 @@ Everything needed to rerun the benchmarks is in this repository:
 | Path | Contents |
 | :--- | :--- |
 | `mods/steady_hearth/` | The mod |
-| `mods/perf_bench/` | The benchmark scenario: builds the XL world (4 towns, buildings, storage, crafters, raids) and logs KPIs per game hour |
+| `mods/perf_bench/` | The benchmark scenario: builds the XL world (4 towns, buildings, storage, crafters, raids, ridges with passes, a lake per town) from one shared map definition (`bench_map.lua`) and logs KPIs per game hour |
 | `mods/perf_census/` | Diagnostic counters (listeners, caches, AI actions, placement requests, search times); never enabled in timing runs |
 | `mods/perf_probe/` | Runtime probes (what the sandbox exposes, heap ceiling) |
-| `tools/` | Run harness: `bench.sh` (one run), `run_game.sh` (one game with watchdog, host sleep detection and error log), `queue.py` (resumable run plans), `parse_bench.py`, `ab_report.py` (A/B statistics), `phase_report.py`, `profile_report.py`, `watch_errors.py` |
+| `tools/` | Run harness: `bench.sh` (one run), `run_game.sh` (one game with watchdog, host sleep detection and error log), `queue.py` (resumable run plans), `parse_bench.py`, `ab_report.py` (A/B statistics), `phase_report.py`, `profile_report.py`, `watch_errors.py`, `bench_layout.py` (checks and draws the map layout of a run) |
 | `docs/harness/` | How the harness works and how to set it up (`wine.md` for macOS, `bench.md` for the scenario and run rules) |
 | `docs/experiments/` | One file per fix: hypothesis, change, runs, results and decision |
 | `docs/ace-notes.md` | The ACE issues found, with evidence |

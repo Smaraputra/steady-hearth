@@ -6,7 +6,7 @@
 
 ## Change
 
-Patch `desires_need_by_request`: a copy of the method that iterates `self._material_desires` and keeps the keys present in `material.material_subsets`. With `mods.steady_hearth.shadow_checks=true` every call also runs the original loop and logs any difference. Review: Codex, no defects (`docs/research/reviews/2026-10-29-desires-review-codex.md`).
+Patch `desires_need_by_request`: a copy of the method that iterates `self._material_desires` and keeps the keys present in `material.material_subsets`. With `mods.steady_hearth.shadow_checks=true` every call also runs the original loop and logs any difference. Review: Codex, no defects (unpublished notes).
 
 ## Results (2026-10-29, ACE XL, one game day each, minimum graphics, not timing runs)
 

@@ -13,7 +13,7 @@ The census of 2026-10-28 (`placement_tasks`) found every entry of every town sta
 
 ## Change
 
-Two patches, default off until validated, both built on `placement_common.lua`:
+Two patches, on by default since 2026-10-29 (see section "ACE combined check"), both built on `placement_common.lua`:
 
 1. `base_placement_requests_release` (vanilla): a wrapper around `_add_to_town` records each request the original makes (player, item, quality); `_remove_from_town` (a copy of the original with the release moved out of the limited block) releases exactly the recorded requests. Once entries are released, the entry under a placement action's cursor can disappear, and `next()` from a key that is no longer in the table is undefined in Lua 5.1, so the two base actions that use a plain `next` (`place_item_type_on_structure_2`, `place_summon_stone_type`) get a wrapper that restarts from the beginning in that case, which is what ACE's own actions already do (`prev_key`).
 2. `ace_placement_requests_release` (ACE): the same for ACE's `_add_to_town` and `_remove_from_town` (build fixtures and other items go to their own lists, with their placement tag), `_unrequest_placement_task` looking the entry up under the placement tag its request used, and the restart wrapper for ACE's copy of the summon stone action.
@@ -28,7 +28,7 @@ The installer gained two options for this: an `also` part may name its own targe
 
 ## Results
 
-Pending.
+On by default since 2026-10-29 (see section "ACE combined check").
 
 ### Vanilla census (2026-10-29, two game days, not timing runs)
 

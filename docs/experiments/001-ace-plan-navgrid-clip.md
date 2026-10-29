@@ -6,7 +6,7 @@ ACE's `BlueprintsToBuildingPiecesJob:clone_nav_grid` (`stonehearth_ace/monkey_pa
 
 ## Change
 
-`mods/steady_hearth/patches/ace_plan_navgrid_clip.lua`, toggle `mods.steady_hearth.patches.ace_plan_navgrid_clip` (default off while the experiment runs). It replaces the method only when the current one comes from the expected ACE file and line range (348 to 415). The copy is identical to ACE's function except for the building loop: `if r:intersects_cube(bounds) then cursor:add_region(r:intersect_cube(bounds)) end`, without ACE's second unconditional `add_region`.
+`mods/steady_hearth/patches/ace_plan_navgrid_clip.lua`, toggle `mods.steady_hearth.patches.ace_plan_navgrid_clip` (on by default since 2026-10-29, see section "Decision (2026-10-29 01:17)"). It replaces the method only when the current one comes from the expected ACE file and line range (348 to 415). The first variant (the two "on" runs in the results) was identical to ACE's function except for the building loop: `if r:intersects_cube(bounds) then cursor:add_region(r:intersect_cube(bounds)) end`, without ACE's second unconditional `add_region`. The shipped variant keeps the whole region of every finished building that comes within a horizontal margin of the plan bounds (`mods.steady_hearth.ace_plan_nearby_margin`, default 16 voxels), adds it once instead of twice, and passes explicitly empty bounds to the clone (E9).
 
 ## Method
 
@@ -40,7 +40,7 @@ Open gameplay question from this table: unpatched run off r2 finished the small 
 
 ## Review and second variant
 
-Codex reviewed the first variant (`docs/research/reviews/2026-10-27-patch-001-review-codex.md`). Planning queries on the private nav grid are not bounded, so clipping could in principle remove a detour over a neighbouring roof or bridge just outside the bounds. The patch therefore changed to a second variant: finished buildings whose region comes within 16 voxels (horizontally) of the plan bounds keep their full region, and only distant buildings are dropped (`mods.steady_hearth.ace_plan_nearby_margin`). The installer also gained a bytecode checksum guard. The two "on" runs above measured the clipping variant. The second variant is measured separately (runs `ab-nearby-*`).
+Codex reviewed the first variant (unpublished notes). Planning queries on the private nav grid are not bounded, so clipping could in principle remove a detour over a neighbouring roof or bridge just outside the bounds. The patch therefore changed to a second variant: finished buildings whose region comes within 16 voxels (horizontally) of the plan bounds keep their full region, and only distant buildings are dropped (`mods.steady_hearth.ace_plan_nearby_margin`). The installer also gained an optional bytecode checksum guard (supported, not used by any patch so far). The two "on" runs above measured the clipping variant. The second variant is measured separately (runs `ab-nearby-*`).
 
 ## Gameplay equivalence
 

@@ -2,7 +2,18 @@
    "info" : {
       "name" : "Perf Bench",
       "namespace" : "perf_bench",
-      "version" : 3
+      "version" : 4
+   },
+   "client_init_script" : "file(perf_bench_client)",
+   "functions" : {
+      "probe_phase" : {
+         "controller" : "file(call_handlers/probe_call_handler.lua)",
+         "endpoint" : "server"
+      },
+      "probe_done" : {
+         "controller" : "file(call_handlers/probe_call_handler.lua)",
+         "endpoint" : "server"
+      }
    },
    "mixintos" : {
       "stonehearth_autotest/tests/index.json" : "file(tests/index_mixin.json)"

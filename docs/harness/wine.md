@@ -1,6 +1,6 @@
 # Wine harness on Apple Silicon
 
-Stonehearth v1.1.0.949 (x64 engine) runs under Wine on this Mac. This page records the pinned setup and what has been verified.
+Stonehearth v1.1.0.949 (x64 engine) runs under Wine on macOS (Apple Silicon). This page records the pinned setup and what has been verified.
 
 ## Host
 
@@ -16,12 +16,12 @@ Stonehearth v1.1.0.949 (x64 engine) runs under Wine on this Mac. This page recor
 | :--- | :--- |
 | Build | WineHQ wine-stable 11.0_1, Gcenx macOS build (`wine-stable-11.0_1-osx64.tar.xz`) |
 | SHA-256 | `b50dc50ec7f41d58b115a6b685d4d1315ba3c797bd3aa0f49213f2703cb82388` (matches the GitHub release digest) |
-| Install path | `~/Applications/wine-11.0_1/Wine Stable.app` (side by side with the older Homebrew 9.0 that Kegworks and Wineskin use) |
+| Install path | `~/Applications/wine-11.0_1/Wine Stable.app` |
 | Binary | single WoW64 `wine` (no separate `wine64` in Wine 11) |
 | Prefix | `~/.local/share/stonehearth-perf/wineprefix` |
 | Runtimes installed | VC++ 2015-2019 x64 and x86, VC++ 2010 x64 and x86, OpenAL (all from the game's `_Redist` folder, silent install) |
 
-Homebrew disabled the `wine-stable` and `wine@devel` casks on 2026-09-01 because they fail Gatekeeper. A build downloaded with `curl` carries no quarantine attribute, so it runs without a Gatekeeper prompt. The owner approved this route on 2026-10-27.
+Homebrew disabled the `wine-stable` and `wine@devel` casks on 2026-09-01, so the harness uses the release build named above, checked against its published SHA-256.
 
 The environment is defined once in `tools/wine_env.sh`:
 - `OPENSSL_ia32cap=:~0x20000000` works around the old OpenSSL crash on CPUs that report SHA extensions.

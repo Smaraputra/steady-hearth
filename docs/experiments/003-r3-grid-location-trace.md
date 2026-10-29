@@ -6,7 +6,7 @@
 
 ## Change
 
-`mods/steady_hearth/patches/grid_location_trace.lua`, toggle `mods.steady_hearth.patches.grid_location_trace`, default off until the timing A/B. It replaces `radiant.entities.trace_grid_location` on the server (`radiant/server.lua:42` sets `radiant.entities`), guarded by source file and line range, through a new installer target kind (`patch.global`, a path from `_G`). Same semantics: the filter only runs while a changed callback is set, `last_location` is updated the same way (also to nil off the world), the callback gets the new location only when it is not nil, and the returned object has `on_changed`, `on_destroyed`, `push_object_state` and `destroy`. ACE does not override the function, and the client's `client_entities.lua` is untouched. Codex found no issues (`docs/research/reviews/2026-10-28-r3-review-codex.md`).
+`mods/steady_hearth/patches/grid_location_trace.lua`, toggle `mods.steady_hearth.patches.grid_location_trace`, default off until the timing A/B. It replaces `radiant.entities.trace_grid_location` on the server (`radiant/server.lua:42` sets `radiant.entities`), guarded by source file and line range, through a new installer target kind (`patch.global`, a path from `_G`). Same semantics: the filter only runs while a changed callback is set, `last_location` is updated the same way (also to nil off the world), the callback gets the new location only when it is not nil, and the returned object has `on_changed`, `on_destroyed`, `push_object_state` and `destroy`. ACE does not override the function, and the client's `client_entities.lua` is untouched. Codex found no issues (unpublished notes).
 
 ## Plan
 

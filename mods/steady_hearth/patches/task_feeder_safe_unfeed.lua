@@ -1,5 +1,5 @@
--- Task feeder: take a task's action back from a worker that left the group, but never while the
--- worker is still executing it (finding T1, third approach).
+-- Task feeder: take a task's action back from a worker that left the group, but not while the
+-- worker is still executing it, apart from the residual race described below (finding T1, third approach).
 --
 -- TaskFeeder:_start_feeding listens for 'worker_remove', but TaskGroup:remove_worker triggers
 -- 'worker_removed', so a worker that leaves a group keeps the actions of the group's tasks; the
@@ -18,7 +18,7 @@
 -- the engine has stopped that action (Task:__action_stopped clears it from _running_actions), and is
 -- unfed then. The check is repeated when the deferred removal actually runs
 -- (_process_deferred_unfed_workers): a worker that is back in the group keeps the action, and one
--- that runs it again goes back to waiting, so no removal reaches an executing action while the task
+-- that runs it again goes back to waiting, so, apart from that residual, no removal reaches an executing action while the task
 -- lives. A worker that rejoins while waiting is forgotten and handled as in the shipped game. When the
 -- task ends, its current workers are unfed exactly as shipped, and departed workers still waiting or
 -- still running the action are dropped without an unfeed, as the shipped game never unfeeds departed

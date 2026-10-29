@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rough Lua 5.1 structure check for machines without a Lua toolchain (none is installed here).
+"""Rough Lua 5.1 structure check for machines without a Lua toolchain.
 
 Usage: tools/lua_balance.py <file.lua> [...]
 

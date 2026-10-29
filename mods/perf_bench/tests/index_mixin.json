@@ -15,7 +15,7 @@
          "world_generator" : "file(bench_world_large.lua)",
          "groups" : {
             "perf_bench_large" : {
-               "name" : "Fixed-time 4-player late-game benchmark (100+ hearthlings, 40 buildings)",
+               "name" : "Fixed-time 4-player late-game benchmark (112 hearthlings, 44 buildings)",
                "scripts" : [
                   "file(bench_xl.lua)"
                ]

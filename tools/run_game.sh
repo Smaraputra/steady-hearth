@@ -178,6 +178,13 @@ for d in "$SH_GAME_DIR" "$SH_GAME_DIR/x64"; do
    for f in "$d"/lua_memory_profile_*.txt; do
       [ -f "$f" ] && mv "$f" "$run_dir/"
    done
+   # the post-window save probe (mods.perf_bench.post_probes) saves as perf_bench_probe under
+   # saved_games/: record its size and files, then remove it so test saves never accumulate
+   if [ -d "$d/saved_games/perf_bench_probe" ]; then
+      { echo "dir=$d/saved_games/perf_bench_probe kb=$(du -sk "$d/saved_games/perf_bench_probe" | cut -f1)"
+        ls -l "$d/saved_games/perf_bench_probe"; } > "$run_dir/save_probe.txt"
+      rm -rf "$d/saved_games/perf_bench_probe"
+   fi
 done
 slept=$(python3 -c "print(round($(sleep_offset) - $offset_start))")
 # classified script errors, so a run is reviewable even when nobody watched it live

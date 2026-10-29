@@ -20,7 +20,7 @@ Three patches, default off while the experiment runs:
 2. `ace_restock_shared_nearby_filter` replaces `RestockDirector._generate_next_errand`: it passes the shared `filter_fn` and the priority check as the predicate, only when patch 1 is installed (checked by function identity), and otherwise runs as without the patch.
 3. `ace_reconsider_clears_search_caches` wraps `AiService:_add_reconsidered_entity` so that it also clears the reconsidered entity from the result caches of searches still running, as the loop in the release does for `FAST_CALL_CACHES`. Codex round 3 found that without it a private cache keeps a stale result: an item rejected in one storage and moved to another during the same search would be skipped where ACE without the patch re-evaluates it (verified in source, `ai_service.lua:496-501`). Patch 1 uses its own result caches only while this wrapper is the installed method.
 
-Reviews: Codex rounds 1 and 2 for R7 (`docs/research/reviews/2026-10-28-r7-review-codex.md`); rounds 3 and 4 for R7b (`docs/research/reviews/2026-10-28-r7b-review-codex.md`; round 4 found no issues).
+Reviews: Codex rounds 1 and 2 for R7 (unpublished notes); rounds 3 and 4 for R7b (unpublished notes; round 4 found no issues).
 
 ## Plan
 

@@ -1,12 +1,17 @@
--- Fixed-time late-game benchmark: a 512 x 512 map with 4 player towns (104 hearthlings),
--- 40 template buildings (32 finished, 8 under construction), 8 mining zones, about 5,000 items,
--- forests, critters and recurring goblin raids. After a warm-up the run simulates one game day
--- and reports how much real time that day took (primary metric) and how much work each town
--- completed (behaviour KPIs). Output lines use the PERF_BENCH format from bench_lib.
+-- Fixed-time late-game benchmark (scenario xl-v4): a 512 x 512 map with 4 player towns (112
+-- hearthlings) divided by two crossing ridges with a stepped pass on each arm, a lake beside every
+-- town, 44 template buildings (36 finished, 8 under construction), 8 mining zones, about 5,000
+-- items, forests, 300 wild trees, critters and recurring goblin raids. After a warm-up the run
+-- simulates one game day and reports how much real and busy time that day took (busy time, from the
+-- engine's phase lines, is the primary metric: docs/harness/bench.md) and how much work each town
+-- completed (behaviour KPIs). Every coordinate comes from bench_map, which the
+-- world generator shares. Output lines use the PERF_BENCH format from bench_lib.
 local Point3 = _radiant.csg.Point3
 local Cube3 = _radiant.csg.Cube3
 local Region3 = _radiant.csg.Region3
 local bench_lib = require 'perf_bench.tests.bench_lib'
+local bench_map = require 'perf_bench.tests.bench_map'
+local probe_state = require 'perf_bench.lib.probe_state'
 local template_utils = require 'stonehearth.lib.building.template_utils'
 
 local emit = bench_lib.emit
@@ -14,20 +19,12 @@ local now_real_s = bench_lib.now_real_s
 local now_game_s = bench_lib.now_game_s
 local grid = bench_lib.grid
 
--- player_1 is created by the autotest environment, while the others are added here.
-local PLAYERS = {
-   { id = 'player_1', kingdom = nil, cx = -128, cz = -128 },
-   { id = 'player_2', kingdom = 'rayyas_children:kingdoms:rayyas_children', cx = 128, cz = -128 },
-   { id = 'player_3', kingdom = 'northern_alliance:kingdoms:northern_alliance', cx = -128, cz = 128 },
-   { id = 'player_4', kingdom = 'stonehearth:kingdoms:ascendancy', cx = 128, cz = 128 },
-}
+local PLAYERS = bench_map.TOWNS
+local GRIDS, AREAS = bench_map.GRIDS, bench_map.AREAS
 
 local TOWN = {
    workers = 20,
    soldiers = 4,
-   full_chests = 16,           -- 64 items each
-   loose_items = 150,          -- hauling work
-   food_baskets = 60,
    -- Housing-first layout: 23 beds, a dining hall (10 chairs, 4 tables) and workshops are finished,
    -- two more houses are left for the builders. Missing beds and seats are topped up afterwards.
    buildings_done = { 'shared_sleeping_quarters_new', 'shared_sleeping_quarters_new',
@@ -35,13 +32,14 @@ local TOWN = {
                       'cottage_for_two_new', 'cottage_for_two_new', 'herbalist_house_new',
                       'dining_hall_new', 'carpenter_house_new' },
    buildings_live = { 'blacksmith_house_new', 'tiny_cottage_new' },
-   forest_trees = 40,
-   harvest_trees = 20,
-   hill_mine = { w = 12, l = 12, h = 4 },
-   pit_mine = { w = 10, l = 10, d = 3 },
-   farm = { x = 10, y = 10 },
+   harvest_trees = 15,         -- in the town forest
+   crest_harvests = 5,         -- wild trees on the nearest ridge crest, reached through a pass
    craft_target = 4,
 }
+
+-- The carpenter house's input shelves get the filter a player would give them: the carpenter's wood.
+-- Unfiltered, the base game marks them with an attention icon and they take nothing.
+local SHELF_FILTER = { 'wood resource' }
 
 local CHEST_CONTENTS = {
    'stonehearth:resources:wood:oak_log',
@@ -84,6 +82,7 @@ local TEMPLATE_PREFIX = '/r/mods/stonehearth/data/saved_objects/building_templat
 
 local WILD_TREES = 300
 local CRITTERS = 40
+local SCATTER_SEED = 1029
 -- One town per raid in rotation, so each town is raided about every 36 game hours by a small party.
 -- The vanilla goblin and ambient threat campaigns wait a day or more between encounters and send
 -- parties of 1 to 3 per unit type.
@@ -119,6 +118,59 @@ local FOOTMAN_TALISMAN = 'stonehearth:footman:wooden_sword_talisman'
 -- builders, so no building plan jobs run.
 local live_config = _host:get_config('mods.perf_bench.live_buildings')
 local LIVE_BUILDINGS = not (live_config == false or live_config == 'false')
+-- Diagnostic runs only: mods.perf_bench.post_probes=true runs the client probes (perf_bench_client)
+-- after the measured window and waits up to PROBE_TIMEOUT_S for their report before ending.
+local probes_config = _host:get_config('mods.perf_bench.post_probes')
+local POST_PROBES = probes_config == true or probes_config == 'true'
+local PROBE_TIMEOUT_S = 180
+
+-- Every placement point is checked against the map, less a margin, and logged when outside it.
+local out_of_bounds = 0
+local function check_point(x, z, what, player)
+   local lo, hi = bench_map.MIN + bench_map.EDGE_MARGIN, bench_map.MAX - bench_map.EDGE_MARGIN
+   if x < lo or x >= hi or z < lo or z >= hi then
+      out_of_bounds = out_of_bounds + 1
+      emit('warning', { what = 'out_of_bounds', kind = what, player = player or 'map', x = x, z = z })
+   end
+end
+
+-- One `layout` line per placed feature (tools/bench_layout.py checks and draws them). The
+-- fingerprint covers the map and the features every variant places identically; buildings, supply
+-- yards and the bed, seat and table top-ups depend on the templates and costs, which ACE changes.
+local layout = { count = 0, hash = 5381 }
+local FINGERPRINT_SKIP = { building = true, supply = true, beds = true, seats = true, tables = true }
+local function emit_layout(kind, player, r)
+   emit('layout', { kind = kind, player = player, x0 = r.x0, z0 = r.z0, x1 = r.x1, z1 = r.z1 })
+   layout.count = layout.count + 1
+   if not FINGERPRINT_SKIP[kind] then
+      layout.hash = bench_map.hash(string.format('%s|%s|%d|%d|%d|%d', kind, player, r.x0, r.z0, r.x1, r.z1), layout.hash)
+   end
+end
+
+-- Points of one of bench_map.GRIDS for a town (n of them, or the grid's own count), checked and
+-- logged as one layout rectangle.
+local function town_grid(p, name, n)
+   local g = GRIDS[name]
+   local points = grid(p.cx + g.dx, p.cz + g.dz, g.cols, n or g.n, g.spacing)
+   if #points > 0 then
+      local x0, z0, x1, z1 = math.huge, math.huge, -math.huge, -math.huge
+      for _, pt in ipairs(points) do
+         check_point(pt[1], pt[2], name, p.id)
+         x0, z0 = math.min(x0, pt[1]), math.min(z0, pt[2])
+         x1, z1 = math.max(x1, pt[1]), math.max(z1, pt[2])
+      end
+      emit_layout(name, p.id, { x0 = x0 + g.foot[1], z0 = z0 + g.foot[1], x1 = x1 + g.foot[2], z1 = z1 + g.foot[2] })
+   end
+   return points
+end
+
+local function town_area(p, name)
+   local a = AREAS[name]
+   local r = { x0 = p.cx + a.dx, z0 = p.cz + a.dz, x1 = p.cx + a.dx + a.w, z1 = p.cz + a.dz + a.l }
+   check_point(r.x0, r.z0, name, p.id)
+   check_point(r.x1 - 1, r.z1 - 1, name, p.id)
+   return r
+end
 
 local function ground_y(x, z)
    return radiant.terrain.get_point_on_terrain(Point3(x, 0, z)).y
@@ -135,7 +187,7 @@ local template_offsets = {}
 local function template_offset(template_id)
    local cached = template_offsets[template_id]
    if cached then
-      return cached.offset, cached.sunk
+      return cached.offset, cached.sunk, cached.extent
    end
    local template = template_utils.load_template_data(template_id)
    local min_y, min_x, max_x, min_z, max_z
@@ -158,8 +210,10 @@ local function template_offset(template_id)
       end
    end
    local offset = Point3(-math.floor((min_x + max_x) / 2), -min_y, -math.floor((min_z + max_z) / 2))
-   template_offsets[template_id] = { offset = offset, sunk = template.header.sunk }
-   return offset, template.header.sunk
+   -- footprint relative to the placement point, for the layout line
+   local extent = { x0 = min_x + offset.x, z0 = min_z + offset.z, x1 = max_x + offset.x, z1 = max_z + offset.z }
+   template_offsets[template_id] = { offset = offset, sunk = template.header.sunk, extent = extent }
+   return offset, template.header.sunk, extent
 end
 
 local function place_template(pid, template_name, x, z)
@@ -200,6 +254,58 @@ local function fill_container(container, item_uri, inventory)
    end
 end
 
+-- Supply yard of a building under construction: every item it needs, as a player would stock it,
+-- packed in rows inside the town (bench_map.supply_yard) in sorted order so every run lays it out
+-- the same way. Resource costs are voxels per building material; item costs are fixtures and
+-- furniture keyed 'uri+quality' (for example 'stonehearth:furniture:not_much_of_a_bed+-1').
+local function stock_supply_yard(env, p, index, resource_costs, item_costs)
+   local yard = bench_map.supply_yard(p, index)
+   local kinds, needed, supplied = {}, {}, {}
+   local materials = {}
+   for material in pairs(resource_costs or {}) do
+      table.insert(materials, material)
+   end
+   table.sort(materials)
+   for _, material in ipairs(materials) do
+      local voxels = resource_costs[material]
+      table.insert(needed, material .. ':' .. voxels)
+      local supply = material_supply(material)
+      if supply then
+         table.insert(kinds, { uri = supply.uri, n = math.min(math.ceil(voxels * 1.1 / supply.voxels) + 2, 150) })
+      else
+         emit('warning', { player = p.id, what = 'unknown_building_material', material = material, voxels = voxels })
+      end
+   end
+   local keys = {}
+   for key in pairs(item_costs or {}) do
+      table.insert(keys, key)
+   end
+   table.sort(keys)
+   for _, key in ipairs(keys) do
+      table.insert(needed, key .. ':' .. item_costs[key])
+      table.insert(kinds, { uri = key:match('^([^+]+)'), n = math.min(item_costs[key], 150) })
+   end
+
+   local cell = 0
+   for _, kind in ipairs(kinds) do
+      for _ = 1, kind.n do
+         local x = yard.x0 + cell % bench_map.YARD_WIDTH
+         local z = yard.z0 + math.floor(cell / bench_map.YARD_WIDTH)
+         check_point(x, z, 'supply', p.id)
+         env:create_entity(x, z, kind.uri, { owner = p.id })
+         cell = cell + 1
+      end
+      table.insert(supplied, kind.uri .. ':' .. kind.n)
+      cell = cell + 1   -- one free cell between kinds
+   end
+   local rows = math.ceil(cell / bench_map.YARD_WIDTH)
+   if rows > bench_map.YARD_ROWS then
+      emit('warning', { player = p.id, what = 'supply_yard_overflow', rows = rows, limit = bench_map.YARD_ROWS })
+   end
+   emit_layout('supply', p.id, { x0 = yard.x0, z0 = yard.z0, x1 = yard.x1, z1 = yard.z0 + rows })
+   return table.concat(needed, ';'), table.concat(supplied, ';')
+end
+
 local function setup_town(autotest, p, kpi)
    local env = autotest.env
    local pid, cx, cz = p.id, p.cx, p.cz
@@ -209,32 +315,38 @@ local function setup_town(autotest, p, kpi)
 
    local banner = env:create_entity(Point3(cx, 1, cz), 'stonehearth:camp_standard', { owner = pid, force_iconic = false })
    town:set_banner(banner)
+   emit_layout('banner', pid, { x0 = cx, z0 = cz, x1 = cx + 1, z1 = cz + 1 })
+   emit_layout('lake', pid, bench_map.lake_rect(p))
 
    -- Stored goods: full chests rotating through the raw materials crafters and builders use.
-   for i, pt in ipairs(grid(cx - 40, cz - 40, 8, TOWN.full_chests, 3)) do
+   for i, pt in ipairs(town_grid(p, 'full_chests')) do
       local chest = env:create_entity(pt[1], pt[2], 'stonehearth:containers:stone_chest', { owner = pid, force_iconic = false })
       fill_container(chest, CHEST_CONTENTS[(i - 1) % #CHEST_CONTENTS + 1], inventory)
    end
    -- Empty chests for the haulers, food, and two stockpiles.
-   for _, pt in ipairs(grid(cx - 40, cz - 30, 8, 8, 3)) do
+   for _, pt in ipairs(town_grid(p, 'empty_chests')) do
       env:create_entity(pt[1], pt[2], 'stonehearth:containers:stone_chest', { owner = pid, force_iconic = false })
    end
-   for _, pt in ipairs(grid(cx - 40, cz - 22, 15, TOWN.food_baskets, 1)) do
+   for _, pt in ipairs(town_grid(p, 'food')) do
       env:create_entity(pt[1], pt[2], 'stonehearth:food:corn:corn_basket', { owner = pid })
    end
-   inventory:create_stockpile(Point3(cx - 15, 1, cz - 40), { x = 8, y = 8 })
-   inventory:create_stockpile(Point3(cx - 5, 1, cz - 40), { x = 8, y = 8 })
+   for _, name in ipairs({ 'stockpile_a', 'stockpile_b' }) do
+      local r = town_area(p, name)
+      inventory:create_stockpile(Point3(r.x0, 1, r.z0), { x = r.x1 - r.x0, y = r.z1 - r.z0 })
+      emit_layout('stockpile', pid, r)
+   end
 
    -- Hauling work: loose resources on the ground.
    kpi.haul_items = {}
-   for i, pt in ipairs(grid(cx + 10, cz - 60, 15, TOWN.loose_items, 1)) do
+   for i, pt in ipairs(town_grid(p, 'haul')) do
       local uri = (i % 2 == 0) and 'stonehearth:resources:wood:oak_log' or 'stonehearth:resources:stone:hunk_of_stone'
       table.insert(kpi.haul_items, env:create_entity(pt[1], pt[2], uri, { owner = pid }))
    end
 
-   -- Forest: some trees requested for harvest, the rest left standing.
+   -- Forest: some trees requested for harvest, the rest left standing. More harvest requests go to
+   -- wild trees on the ridge crest once those exist (bench.bench_xl).
    kpi.trees_cut = 0
-   for i, pt in ipairs(grid(cx - 100, cz - 20, 5, TOWN.forest_trees, 5)) do
+   for i, pt in ipairs(town_grid(p, 'forest')) do
       local tree = env:create_entity(pt[1], pt[2], (i % 3 == 0) and 'stonehearth:trees:oak:medium' or 'stonehearth:trees:oak:small')
       if i <= TOWN.harvest_trees then
          tree:get_component('stonehearth:resource_node'):request_harvest(pid)
@@ -246,22 +358,25 @@ local function setup_town(autotest, p, kpi)
 
    -- Two dig sites: a raised hill and a pit.
    local soil = radiant.terrain.get_block_types().soil_dark
-   local hx, hz = cx - 60, cz - 60
-   local hill = TOWN.hill_mine
-   local hill_y = ground_y(hx, hz)
-   env:add_cube_to_terrain(hx, hz, hill.w, hill.l, hill.h, soil)
-   local px, pz = cx - 60, cz + 40
-   local pit = TOWN.pit_mine
-   local pit_y = ground_y(px, pz)
+   local hill, pit = AREAS.hill_mine, AREAS.pit_mine
+   local hill_r, pit_r = town_area(p, 'hill_mine'), town_area(p, 'pit_mine')
+   local hill_y = ground_y(hill_r.x0, hill_r.z0)
+   env:add_cube_to_terrain(hill_r.x0, hill_r.z0, hill.w, hill.l, hill.h, soil)
+   local pit_y = ground_y(pit_r.x0, pit_r.z0)
    kpi.mines = {
-      stonehearth.mining:dig_region(pid, Region3(Cube3(Point3(hx, hill_y, hz), Point3(hx + hill.w, hill_y + hill.h, hz + hill.l)))),
-      stonehearth.mining:dig_region(pid, Region3(Cube3(Point3(px, pit_y - pit.d, pz), Point3(px + pit.w, pit_y, pz + pit.l)))),
+      stonehearth.mining:dig_region(pid, Region3(Cube3(Point3(hill_r.x0, hill_y, hill_r.z0), Point3(hill_r.x1, hill_y + hill.h, hill_r.z1)))),
+      stonehearth.mining:dig_region(pid, Region3(Cube3(Point3(pit_r.x0, pit_y - pit.d, pit_r.z0), Point3(pit_r.x1, pit_y, pit_r.z1)))),
    }
    kpi.mine_blocks = hill.w * hill.l * hill.h + pit.w * pit.l * pit.d
+   emit_layout('hill_mine', pid, hill_r)
+   emit_layout('pit_mine', pid, pit_r)
 
    -- Farm.
-   local field = stonehearth.farming:create_new_field(session, Point3(cx + 20, 1, cz - 85), TOWN.farm, nil, 0)
+   local farm_r = town_area(p, 'farm')
+   local field = stonehearth.farming:create_new_field(session, Point3(farm_r.x0, 1, farm_r.z0),
+                                                      { x = farm_r.x1 - farm_r.x0, y = farm_r.z1 - farm_r.z0 }, nil, 0)
    field:get_component('stonehearth:farmer_field'):set_crop(nil, nil, 'stonehearth:crops:carrot_crop')
+   emit_layout('farm', pid, farm_r)
 
    -- Buildings: finished ones laid out on a grid, plus live construction funded with materials.
    kpi.buildings = { done = 0, live = 0, failed = 0 }
@@ -272,72 +387,53 @@ local function setup_town(autotest, p, kpi)
    for _, t in ipairs(LIVE_BUILDINGS and TOWN.buildings_live or {}) do
       table.insert(plan, { template = t, instant = false })
    end
-   for i, pt in ipairs(grid(cx + 14, cz + 14, 4, #plan, 26)) do
+   local bg = GRIDS.buildings
+   for i, pt in ipairs(grid(cx + bg.dx, cz + bg.dz, bg.cols, #plan, bg.spacing)) do
       local entry = plan[i]
+      check_point(pt[1], pt[2], 'building', pid)
       local ok, building_id = pcall(place_template, pid, entry.template, pt[1], pt[2])
       local building = ok and building_id and radiant.entities.get_entity(building_id)
       if not building then
          kpi.buildings.failed = kpi.buildings.failed + 1
          emit('warning', { player = pid, what = 'template_failed', template = entry.template, err = tostring(building_id) })
-      elseif entry.instant then
-         local bc = building:get('stonehearth:build2:building')
-         bc:instabuild()
-         kpi.buildings.done = kpi.buildings.done + 1
-         if pid == 'player_1' then
-            local bounds = bc:get_bounds()
-            emit('building', { template = entry.template, ground_y = ground_y(pt[1], pt[2]),
-                               min_y = bounds.min.y, max_y = bounds.max.y })
-         end
       else
-         -- Supply each building left for the builders with its own materials, as a player would
-         -- stock them: resource costs are voxels per building material, item costs are fixtures and
-         -- furniture keyed 'uri+quality' (for example 'stonehearth:furniture:not_much_of_a_bed+-1').
-         local resource_costs, item_costs = building:get('stonehearth:build2:building'):get_costs()
-         -- one band of piles per building south of the building grid, inside the map and clear of
-         -- the wild trees along the centre line, 15 items wide and at most 10 deep per pile
-         local fx, fz = cx + 14, cz + 92 + kpi.buildings.live * 11
-         local needed, supplied = {}, {}
-         for material, voxels in pairs(resource_costs or {}) do
-            table.insert(needed, material .. ':' .. voxels)
-            local supply = material_supply(material)
-            if supply then
-               local n = math.ceil(voxels * 1.1 / supply.voxels) + 2
-               for _, spot in ipairs(grid(fx, fz, 15, math.min(n, 150), 1)) do
-                  env:create_entity(spot[1], spot[2], supply.uri, { owner = pid })
-               end
-               table.insert(supplied, supply.uri .. ':' .. math.min(n, 150))
-               fx = fx + 16
-            else
-               emit('warning', { player = pid, what = 'unknown_building_material', material = material, voxels = voxels })
+         local _, _, extent = template_offset(TEMPLATE_PREFIX .. entry.template)
+         emit_layout('building', pid, { x0 = pt[1] + extent.x0, z0 = pt[2] + extent.z0, x1 = pt[1] + extent.x1, z1 = pt[2] + extent.z1 })
+         if entry.instant then
+            local bc = building:get('stonehearth:build2:building')
+            bc:instabuild()
+            kpi.buildings.done = kpi.buildings.done + 1
+            if pid == 'player_1' then
+               local bounds = bc:get_bounds()
+               emit('building', { template = entry.template, ground_y = ground_y(pt[1], pt[2]),
+                                  min_y = bounds.min.y, max_y = bounds.max.y })
             end
+         else
+            local resource_costs, item_costs = building:get('stonehearth:build2:building'):get_costs()
+            local needed, supplied = stock_supply_yard(env, p, kpi.buildings.live + 1, resource_costs, item_costs)
+            emit('costs', { player = pid, template = entry.template, needed = needed, supplied = supplied })
+            stonehearth.building:build(building_id)
+            kpi.buildings.live = kpi.buildings.live + 1
+            kpi.live_buildings = kpi.live_buildings or {}
+            table.insert(kpi.live_buildings, { entity = building, template = entry.template })
          end
-         for cost_key, count in pairs(item_costs or {}) do
-            table.insert(needed, cost_key .. ':' .. count)
-            local uri = cost_key:match('^([^+]+)')
-            for _, spot in ipairs(grid(fx, fz, 15, math.min(count, 150), 1)) do
-               env:create_entity(spot[1], spot[2], uri, { owner = pid })
-            end
-            table.insert(supplied, uri .. ':' .. math.min(count, 150))
-            fx = fx + 16
-         end
-         emit('costs', { player = pid, template = entry.template, needed = table.concat(needed, ';'),
-                         supplied = table.concat(supplied, ';') })
-         stonehearth.building:build(building_id)
-         kpi.buildings.live = kpi.buildings.live + 1
-         kpi.live_buildings = kpi.live_buildings or {}
-         table.insert(kpi.live_buildings, { entity = building, template = entry.template })
       end
    end
 
    -- Crafters with maintain orders.
    kpi.craft_outputs = {}
+   kpi.crafters = {}
    for i, c in ipairs(CRAFTERS) do
-      env:create_entity(cx - 20, cz + 5 + i * 4, c.bench, { owner = pid, force_iconic = false })
-      local crafter = env:create_person(cx - 16, cz + 5 + i * 4, { owner = pid, job = c.job, level = 2 })
+      local z = cz + 5 + i * 4
+      check_point(cx + bench_map.BENCH_DX, z, 'bench', pid)
+      env:create_entity(cx + bench_map.BENCH_DX, z, c.bench, { owner = pid, force_iconic = false })
+      local crafter = env:create_person(cx + bench_map.CRAFTER_DX, z, { owner = pid, job = c.job, level = 2 })
+      table.insert(kpi.crafters, { job = c.job, entity = crafter })
       for _, r in ipairs(c.recipes) do
          kpi.craft_outputs[bench_lib.maintain(crafter, r, pid, TOWN.craft_target)] = true
       end
    end
+   emit_layout('bench', pid, { x0 = cx + bench_map.BENCH_DX - 3, z0 = cz + 7, x1 = cx + bench_map.CRAFTER_DX + 1, z1 = cz + 7 + #CRAFTERS * 4 })
 
    kpi.workers = {}
    for i = 1, TOWN.workers do
@@ -347,24 +443,40 @@ local function setup_town(autotest, p, kpi)
    for i = 1, TOWN.soldiers do
       env:create_person(cx + 4 + i * 2, cz - 6, { owner = pid, job = 'footman' })
    end
+   emit_layout('workers', pid, { x0 = cx, z0 = cz + 2, x1 = cx + 19, z1 = cz + 7 })
+   emit_layout('workers', pid, { x0 = cx + 6, z0 = cz - 6, x1 = cx + 5 + TOWN.soldiers * 2, z1 = cz - 5 })
 
-   -- Every hearthling needs a bed and somewhere to eat: top up what the templates provide.
+   -- Every hearthling needs a bed and somewhere to eat: top up what the templates provide. A dining
+   -- table for every 4 seats stands in its own row behind the seats, clear of the chairs.
    local citizens = TOWN.workers + TOWN.soldiers + #CRAFTERS
    local furniture = count_furniture(pid)
    local missing_beds = math.max(0, citizens - furniture.bed)
-   for _, pt in ipairs(grid(cx - 40, cz + 30, 6, missing_beds, 3)) do
+   for _, pt in ipairs(town_grid(p, 'beds', missing_beds)) do
       env:create_entity(pt[1], pt[2], 'stonehearth:furniture:comfy_bed', { owner = pid, force_iconic = false })
    end
    local missing_seats = math.max(0, math.ceil(citizens / 2) - furniture.chair)
-   for i, pt in ipairs(grid(cx - 40, cz + 45, 6, missing_seats, 2)) do
+   local seats = town_grid(p, 'seats', missing_seats)
+   local table_z = cz + GRIDS.seats.dz + math.ceil(missing_seats / GRIDS.seats.cols) * GRIDS.seats.spacing
+   local tables = 0
+   for i, pt in ipairs(seats) do
       env:create_entity(pt[1], pt[2], 'stonehearth:furniture:simple_wooden_chair', { owner = pid, force_iconic = false })
       if i % 4 == 1 then
-         env:create_entity(pt[1], pt[2] + 1, 'stonehearth:furniture:dining_table', { owner = pid, force_iconic = false })
+         check_point(pt[1], table_z, 'tables', pid)
+         env:create_entity(pt[1], table_z, 'stonehearth:furniture:dining_table', { owner = pid, force_iconic = false })
+         tables = tables + 1
       end
+   end
+   if tables > 0 then
+      local s = GRIDS.seats
+      local last = math.min(missing_seats, s.cols) - 1
+      emit_layout('tables', pid, { x0 = cx + s.dx - 1, z0 = table_z - 1, x1 = cx + s.dx + last * s.spacing + 2, z1 = table_z + 2 })
    end
    kpi.furniture = count_furniture(pid)
    kpi.citizens_start = citizens
    kpi.rescued, kpi.unstuck = 0, 0
+
+   local rx, rz = bench_map.raid_spawn(p)
+   emit_layout('raid_spawn', pid, { x0 = rx + 2, z0 = rz, x1 = rx + 2 * RAID_SIZE + 1, z1 = rz + 1 })
 end
 
 -- Live (under construction) buildings that finished, and each one's plan job status.
@@ -593,27 +705,68 @@ local bench = {}
 
 function bench.bench_xl(autotest)
    local setup_start = now_real_s()
+   out_of_bounds, layout.count, layout.hash = 0, 0, 5381
    local kpis = {}
    for _, p in ipairs(PLAYERS) do
       if p.kingdom then
          stonehearth.player:add_player(p.id, p.kingdom)
       end
-      kpis[p.id] = { crafted = 0, deaths = 0 }
+      kpis[p.id] = { crafted = 0, crafted_by = {}, deaths = 0 }
+   end
+
+   -- The map and its terrain features, as built by the world generator.
+   emit_layout('map', 'map', { x0 = bench_map.MIN, z0 = bench_map.MIN, x1 = bench_map.MAX, z1 = bench_map.MAX })
+   for _, r in ipairs(bench_map.ridge_rects()) do
+      emit_layout('ridge', 'map', r)
+   end
+   for _, pass in ipairs(bench_map.PASSES) do
+      emit_layout('pass', 'map', bench_map.pass_rect(pass))
    end
 
    for _, p in ipairs(PLAYERS) do
       setup_town(autotest, p, kpis[p.id])
    end
 
-   -- Wild trees along the map's central cross and critters between the towns.
-   for _, pt in ipairs(grid(-240, -12, 60, WILD_TREES / 2, 8)) do
-      autotest.env:create_entity(pt[1], pt[2], 'stonehearth:trees:oak:small')
+   -- Wild trees and critters scattered outside the towns (bench_map.scatter, the same every run).
+   -- Each tree is read back to confirm it stands where the map expects it.
+   local trees, rabbits = bench_map.scatter(WILD_TREES, CRITTERS, SCATTER_SEED)
+   local tree_entities, trees_moved, crest_trees = {}, 0, 0
+   for i, t in ipairs(trees) do
+      check_point(t.x, t.z, 'tree', 'map')
+      local tree = autotest.env:create_entity(t.x, t.z, t.uri)
+      tree_entities[i] = tree
+      local location = radiant.entities.get_world_grid_location(tree)
+      if not location or location.x ~= t.x or location.y ~= t.y or location.z ~= t.z then
+         trees_moved = trees_moved + 1
+         if trees_moved <= 10 then
+            emit('warning', { what = 'tree_moved', x = t.x, y = t.y, z = t.z,
+                              got = location and string.format('%d,%d,%d', location.x, location.y, location.z) or 'nil' })
+         end
+      end
+      if t.crest then
+         crest_trees = crest_trees + 1
+      end
+      emit_layout('tree', 'map', t.rect)
    end
-   for _, pt in ipairs(grid(-12, -240, 2, WILD_TREES / 2, 8)) do
-      autotest.env:create_entity(pt[1], pt[2], 'stonehearth:trees:oak:small')
+   for _, r in ipairs(rabbits) do
+      check_point(r.x, r.z, 'rabbit', 'map')
+      autotest.env:create_entity(r.x, r.z, 'stonehearth:rabbit')
+      emit_layout('rabbit', 'map', { x0 = r.x, z0 = r.z, x1 = r.x + 1, z1 = r.z + 1 })
    end
-   for _, pt in ipairs(grid(-60, -60, 8, CRITTERS, 15)) do
-      autotest.env:create_entity(pt[1], pt[2], 'stonehearth:rabbit')
+   -- Each town also harvests the wild trees on the ridge crest nearest to it, reached through a pass.
+   local crest_harvests = bench_map.crest_harvests(trees, TOWN.crest_harvests)
+   for _, p in ipairs(PLAYERS) do
+      local kpi = kpis[p.id]
+      kpi.crest_cut, kpi.crest_total = 0, 0
+      for _, index in ipairs(crest_harvests[p.id] or {}) do
+         local tree = tree_entities[index]
+         tree:get_component('stonehearth:resource_node'):request_harvest(p.id)
+         kpi.crest_total = kpi.crest_total + 1
+         radiant.events.listen_once(tree, 'radiant:entity:pre_destroy', function()
+               kpi.trees_cut = kpi.trees_cut + 1
+               kpi.crest_cut = kpi.crest_cut + 1
+            end)
+      end
    end
 
    -- Crafted outputs and combat outcomes are counted as they happen.
@@ -624,10 +777,12 @@ function bench.bench_xl(autotest)
       end
    end
    autotest.util:listen(radiant, 'radiant:entity:post_create', function(e)
-         if craft_owner[e.entity:get_uri()] then
+         local uri = e.entity:get_uri()
+         if craft_owner[uri] then
             local pid = e.entity:get_player_id()
             if kpis[pid] then
                kpis[pid].crafted = kpis[pid].crafted + 1
+               kpis[pid].crafted_by[uri] = (kpis[pid].crafted_by[uri] or 0) + 1
             end
          end
       end)
@@ -643,16 +798,43 @@ function bench.bench_xl(autotest)
 
    -- Goblin raids, one town at a time in rotation, timed in game time so every run sees the same
    -- pressure.
+   -- The goblins get no orders: they engage what they see (64 voxels), so they appear on open
+   -- ground at the edge of the town (bench_map.raid_spawn). The game time until a goblin first has a
+   -- target is logged per raid (raid_engaged).
    local raids = 0
+   local raid_parties = {}
    stonehearth.calendar:set_interval('perf bench goblin raids', RAID_EVERY, function()
          raids = raids + 1
          local p = PLAYERS[(raids - 1) % #PLAYERS + 1]
+         local sx, sz = bench_map.raid_spawn(p)
+         local party = { raid = raids, player = p.id, game_s = now_game_s(), goblins = {} }
          for i = 1, RAID_SIZE do
-            autotest.env:create_person(p.cx + 45 + i * 2, p.cz + 45, {
-                  owner = 'goblins', weapon = 'stonehearth:weapons:wooden_sword' })
+            check_point(sx + i * 2, sz, 'raid', p.id)
+            table.insert(party.goblins, autotest.env:create_person(sx + i * 2, sz, {
+                  owner = 'goblins', weapon = 'stonehearth:weapons:wooden_sword' }))
          end
+         table.insert(raid_parties, party)
          emit('raid', { player = p.id, size = RAID_SIZE, raid = raids })
       end)
+   local function check_raids()
+      for i = #raid_parties, 1, -1 do
+         local party = raid_parties[i]
+         local engaged, alive = false, false
+         for _, goblin in ipairs(party.goblins) do
+            if goblin:is_valid() then
+               alive = true
+               if stonehearth.combat:get_primary_target(goblin) then
+                  engaged = true
+               end
+            end
+         end
+         if engaged or not alive then
+            emit('raid_engaged', { raid = party.raid, player = party.player, engaged = engaged,
+                                   after_game_s = string.format('%.0f', now_game_s() - party.game_s) })
+            table.remove(raid_parties, i)
+         end
+      end
+   end
 
    if CHURN_WORKERS > 0 then
       local churns, refused, talismans = 0, 0, 0
@@ -795,14 +977,131 @@ function bench.bench_xl(autotest)
       buildings_done = building_summary.done, buildings_live = building_summary.live,
       buildings_failed = building_summary.failed,
       lua_kb = math.floor(collectgarbage('count')),
+      scenario = bench_map.SCENARIO, layout_lines = layout.count, layout_fp = layout.hash,
+      out_of_bounds = out_of_bounds, trees = #trees, crest_trees = crest_trees, trees_moved = trees_moved,
+      rabbits = #rabbits,
    })
+
+   -- Gives the carpenter houses' input shelves their filter (SHELF_FILTER), once storage is active,
+   -- and counts storages still showing the base game's attention icon for a missing filter.
+   local function filter_input_shelves()
+      local owners = {}
+      for _, p in ipairs(PLAYERS) do
+         owners[p.id] = true
+      end
+      local filtered, failed, attention = 0, 0, 0
+      for _, entity in pairs(_radiant.sim.get_all_entities()) do
+         local storage = owners[entity:get_player_id()] and entity:get_component('stonehearth:storage')
+         if storage then
+            if entity:get_uri():find('stonehearth:containers:input_shelf:', 1, true) == 1 then
+               -- a copy per shelf: the inventory sorts the filter in place and the storage keeps it
+               if pcall(storage.set_filter, storage, { unpack(SHELF_FILTER) }) then
+                  filtered = filtered + 1
+               else
+                  failed = failed + 1
+               end
+            end
+            if storage._attention_effect ~= nil then
+               attention = attention + 1
+            end
+         end
+      end
+      emit('shelves', { filtered = filtered, failed = failed, attention = attention })
+   end
+
+   -- Whether the lake bottom, the ridge crest and the far side of each pass next to a town connect
+   -- to open ground at its centre (bench_map.probe_points). The town side is a patch of ground, as in
+   -- the stuck watchdog, because a single voxel there can be taken by an entity (the ACE run of
+   -- 2026-10-29 15:39 reported every check of player_3 unconnected while its workers used the passes).
+   -- Run once topology has processed the terrain.
+   local function check_connectivity()
+      local failures = 0
+      for _, p in ipairs(PLAYERS) do
+         local points = bench_map.probe_points(p)
+         local gy = ground_y(p.cx + 2, p.cz + 2)
+         local town = Region3(Cube3(Point3(p.cx - 2, gy, p.cz - 2), Point3(p.cx + 7, gy + 1, p.cz + 7)))
+         local function connected(from)
+            local ok, result = pcall(_radiant.sim.topology.are_connected, Point3(from.x, from.y, from.z), town, 0)
+            if not ok then
+               failures = failures + 1
+               return 'error'
+            end
+            if not result then
+               failures = failures + 1
+            end
+            return result and 'yes' or 'no'
+         end
+         local fields = { player = p.id }
+         fields.lake = connected(points.lake_bottom)
+         for _, key in ipairs({ 'crest_ns', 'far_ns', 'crest_ew', 'far_ew' }) do
+            if points[key] then
+               fields[key] = connected(points[key])
+            end
+         end
+         emit('connectivity', fields)
+      end
+      return failures
+   end
+
+   -- Water bodies and their levels, map-wide.
+   local function water_state()
+      local bodies, levels = 0, {}
+      for _, entity in pairs(_radiant.sim.get_all_entities()) do
+         local water = entity:get_component('stonehearth:water')
+         if water then
+            bodies = bodies + 1
+            local ok, level = pcall(water.get_water_level, water)
+            table.insert(levels, ok and string.format('%.2f', level) or '?')
+         end
+      end
+      table.sort(levels)
+      return bodies, table.concat(levels, ',')
+   end
+
+   -- Per crafter, each order's product and state: enabled, being crafted, ingredients available,
+   -- maintain condition met.
+   local function order_states(kpi)
+      local parts = {}
+      for _, c in ipairs(kpi.crafters or {}) do
+         if c.entity:is_valid() then
+            local ok, list = pcall(function()
+                  return c.entity:get_component('stonehearth:job'):get_job_info():get_order_list()
+               end)
+            local orders = ok and list and list._sv and list._sv.orders
+            for _, order in ipairs(orders or {}) do
+               local recipe = order:get_recipe()
+               local product = recipe and recipe.produces and recipe.produces[1] and recipe.produces[1].item or '?'
+               local ok_i, has = pcall(order.has_ingredients, order)
+               -- conditions_fulfilled is true while the maintain target is not yet reached
+               local ok_c, due = pcall(order.conditions_fulfilled, order)
+               table.insert(parts, string.format('%s:%s/en=%s/crafting=%s/ingredients=%s/due=%s', c.job,
+                  tostring(product):gsub('^[%w_]+:', ''), tostring(order:get_enabled()),
+                  tostring(order:get_crafting_status()), ok_i and tostring(has) or 'err', ok_c and tostring(due) or 'err'))
+            end
+         end
+      end
+      return table.concat(parts, ';')
+   end
+
+   -- Crafted items per recipe since the window started.
+   local function crafted_in_window(kpi)
+      local parts = {}
+      for uri, n in pairs(kpi.crafted_by) do
+         table.insert(parts, string.format('%s=%d', tostring(uri):gsub('^[%w_]+:', ''), n - ((kpi.crafted_start or {})[uri] or 0)))
+      end
+      table.sort(parts)
+      return table.concat(parts, ';')
+   end
 
    -- What every citizen is doing ('job/activity' counts) and how many may build, to see why
    -- construction stalls.
    local function activities(pop)
-      local counts, builders = {}, 0
+      local counts, builders, swimming = {}, 0, 0
       for _, citizen in pop:get_citizens():each() do
          if citizen:is_valid() then
+            if radiant.entities.has_buff(citizen, 'stonehearth:buffs:swimming') then
+               swimming = swimming + 1
+            end
             local job = citizen:get_component('stonehearth:job')
             local job_name = job and tostring(job:get_job_uri()):gsub('^.*:jobs:', '') or '?'
             local ai = citizen:get_component('stonehearth:ai')
@@ -820,16 +1119,16 @@ function bench.bench_xl(autotest)
          table.insert(parts, key .. ':' .. n)
       end
       table.sort(parts)
-      return table.concat(parts, ';'), builders
+      return table.concat(parts, ';'), builders, swimming
    end
 
    local function emit_kpis(phase)
       for _, p in ipairs(PLAYERS) do
          local kpi = kpis[p.id]
          local pop = stonehearth.population:get_population(p.id)
-         local doing, builders = '', -1
+         local doing, builders, swimming = '', -1, -1
          if pop then
-            doing, builders = activities(pop)
+            doing, builders, swimming = activities(pop)
          end
          emit('kpi', {
             phase = phase, player = p.id,
@@ -838,15 +1137,19 @@ function bench.bench_xl(autotest)
             stranded_rescued = kpi.stranded_rescued or 0,
             stored = count_stored(kpi, stonehearth.inventory:get_inventory(p.id)),
             haul_total = #kpi.haul_items,
-            trees_cut = kpi.trees_cut, mined = count_mined(kpi), mine_total = kpi.mine_blocks,
-            crafted = kpi.crafted, deaths = kpi.deaths,
+            trees_cut = kpi.trees_cut, crest_cut = kpi.crest_cut, crest_total = kpi.crest_total,
+            mined = count_mined(kpi), mine_total = kpi.mine_blocks, swimming = swimming,
+            crafted = kpi.crafted, crafted_window = crafted_in_window(kpi), orders = order_states(kpi),
+            deaths = kpi.deaths,
             rescued = kpi.rescued, unstuck = kpi.unstuck,
             beds = kpi.furniture.bed, chairs = kpi.furniture.chair, tables = kpi.furniture.table,
             built = count_built(kpi), plan = plan_states(kpi), progress = build_progress(kpi),
             materials = material_states(kpi), chunks = chunk_states(kpi, p),
          })
       end
-      emit('kpi_global', { phase = phase, raids = raids, goblins_killed = goblins_killed })
+      local water_bodies, water_levels = water_state()
+      emit('kpi_global', { phase = phase, raids = raids, goblins_killed = goblins_killed,
+                           raids_unengaged = #raid_parties, water_bodies = water_bodies, water_levels = water_levels })
    end
 
    local start_game = now_game_s()
@@ -866,17 +1169,28 @@ function bench.bench_xl(autotest)
             return
          end
          ticks = ticks + 1
-         if ticks == 1 and PROFILE_PHASE == 'warmup' then
-            toggle_profiler('warmup_start')
+         if ticks == 1 then
+            filter_input_shelves()
+            if PROFILE_PHASE == 'warmup' then
+               toggle_profiler('warmup_start')
+            end
          end
          local g = now_game_s()
          if not window_start_real and g - start_game >= WARMUP_GAME_S then
             if PROFILE_PHASE == 'warmup' or PROFILE_PHASE == 'window' then
                toggle_profiler('window_start')
             end
+            -- diagnostics first, so they stay out of the measured window
+            local unconnected = check_connectivity()
+            for _, kpi in pairs(kpis) do
+               kpi.crafted_start = {}
+               for uri, n in pairs(kpi.crafted_by) do
+                  kpi.crafted_start[uri] = n
+               end
+            end
             window_start_real, window_start_game = now_real_s(), g
             emit('window_start', { game_s = string.format('%.1f', g - start_game), tick = ticks,
-                                   lua_kb = math.floor(collectgarbage('count')) })
+                                   lua_kb = math.floor(collectgarbage('count')), unconnected = unconnected })
             emit_kpis('start')
          end
          if window_start_real and g - window_start_game >= WINDOW_GAME_S then
@@ -891,13 +1205,34 @@ function bench.bench_xl(autotest)
                ticks = ticks,
                lua_kb = math.floor(collectgarbage('count')),
             })
+            -- After the window: stop and flush the server profile, then (post_probes) let the client
+            -- run its probes and wait for its report, then end the test.
+            local function after_profile()
+               if not POST_PROBES then
+                  autotest:success()
+                  return
+               end
+               probe_state.phase = 'client'
+               local waited_from = now_real_s()
+               local wait
+               wait = radiant.set_realtime_interval('perf_bench probe wait', 1000, function()
+                     local reported = probe_state.phase == 'done'
+                     if reported or now_real_s() - waited_from > PROBE_TIMEOUT_S then
+                        wait:destroy()
+                        local fields = { reported = reported, waited_s = string.format('%.1f', now_real_s() - waited_from) }
+                        for k, v in pairs(probe_state.result or {}) do
+                           fields[k] = tostring(v)
+                        end
+                        emit('probe', fields)
+                        autotest:success()
+                     end
+                  end)
+            end
             if PROFILE_PHASE == 'window' then
                toggle_profiler('done')
-               radiant.set_realtime_timer('perf_bench profile flush', PROFILE_FLUSH_MS, function()
-                     autotest:success()
-                  end)
+               radiant.set_realtime_timer('perf_bench profile flush', PROFILE_FLUSH_MS, after_profile)
             else
-               autotest:success()
+               after_profile()
             end
             return
          end
@@ -913,6 +1248,7 @@ function bench.bench_xl(autotest)
          end
          if ticks % 20 == 0 then
             track_live_buildings(PLAYERS, kpis, g - start_game)
+            check_raids()
          end
          if ticks % KPI_EVERY_TICKS == 0 then
             emit_kpis('progress')

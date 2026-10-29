@@ -1,4 +1,4 @@
--- Stonehearth Perf: guarded performance patches for the base game and ACE.
+-- Steady Hearth: guarded performance patches for the base game and ACE.
 --
 -- Every patch replaces one method of one module (patch.module, loaded with radiant.mods.require), of
 -- one script loaded by alias (patch.script, the way the AI loads actions), or of a global table

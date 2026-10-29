@@ -11,7 +11,7 @@
 -- of the plan bounds (horizontally), and adds it once instead of twice. Nearby buildings keep their
 -- whole geometry, so any detour over a neighbouring roof or bridge that ACE's planner could find is
 -- preserved; distant buildings cannot be reached from the plan area because no terrain outside the
--- bounds is copied. Log lines go to the steady_hearth.build.* category instead of ACE's.
+-- bounds is copied. Log lines use the same category as ACE's (build.blueprints_to_building_pieces_job).
 -- It also passes explicitly empty bounds to clone_nav_grid instead of Cube3(), which is not
 -- initialized (finding E9, see ace_plan_clone_empty_bounds.lua).
 local Cube3 = _radiant.csg.Cube3
