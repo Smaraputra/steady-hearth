@@ -31,6 +31,7 @@ The mod patches the game's Lua code at load time. Each patch first checks that t
 | Search early exit (RT1, RT2) | Base game and ACE | Item searches keep running after their answer is known; orphaned timers cause engine CHECK failures | Base game busy time **-2.3%** (p 0.009), job-list time **-8.0%** (p 0.004); duplicate AI decisions 5,000 to 12,000 per game day to 0 |
 | Lease release fan-out | Base game and ACE | Every path search listens to every item lease release in the town | Lua time in path-search code **7.2% to 1.5%** of all Lua samples |
 | Harvest need ratings | Base game and ACE | Harvest actions rate every candidate tree or bush by checking every combination of its material tags against the town's requests | Share of Lua time in this code **10.1% to 0.3%** (ACE benchmark); identical results, checked call by call |
+| Material checks | Base game and ACE | Searches check every candidate item's material tags against the requested material, rebuilding the same comparison each time | Share of Lua time in material checks **4.1% to 2.8%** (base game) and **7.3% to 5.1%** (ACE), same answers ([experiment 009](docs/experiments/009-restock-caches-material-memo.md)) |
 | Stale placement requests (E1, A2b) | Base game and ACE | Placement requests stay in town tables after placement, so workers keep checking placed items (5 s each) | Stale requests after two game days **64 to 0** |
 | Script errors (RT6, X7) | Base game / ACE | A building-monitor error and an ACE titles error in multiplayer towns | Errors gone |
 
@@ -74,6 +75,9 @@ Every fix has a switch. Add it to the `user_settings.json` file in your Stonehea
 | `desires_need_by_request` | on | Harvest need ratings |
 | `base_placement_requests_release`, `ace_placement_requests_release` | on | Stale placement requests |
 | `base_chunk_node_working_regions`, `ace_titles_nil_threshold` | on | Script errors |
+| `base_material_check_memo`, `ace_material_check_memo` | on | Material checks |
+| `base_restock_rating_cache` | off | Uses the restock director's unused rating cache. It changes which errands hearthlings pick and is not yet measured on its own |
+| `base_restock_validity_window`, `ace_restock_validity_window` | off | Trusts a checked restock errand for about a second. Runs with it on did less town work, so it is off until measured on its own |
 | `grid_location_trace` | off | Fewer allocations in position traces; correct, but no measurable gain yet |
 | `task_feeder_safe_unfeed` | off | Removes task actions that pile up on hearthlings who change jobs; no CPU gain measured yet |
 
@@ -81,7 +85,7 @@ Patches named `ace_*` only install when ACE is present, and most `base_*` patche
 
 ## Reporting problems
 
-Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.1.0: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
+Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.2.0: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How this was made
 

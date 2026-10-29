@@ -10,8 +10,9 @@
 -- item's materials, which gives the same maximum, because unrequested materials contribute 0 and the
 -- count starts at the item's own needed count (never negative).
 --
--- With mods.steady_hearth.shadow_checks=true (diagnostic runs only) every call also runs the original
--- loop and logs any difference, plus a running total every 20,000 calls.
+-- With mods.steady_hearth.shadow_checks=true (diagnostic runs only) calls also run the original loop
+-- and log any difference, plus a running total every 2,000 checks. mods.steady_hearth.shadow_every=N
+-- checks one call in N (default every call), so a profiling run can carry the check.
 
 local log = function(fmt, ...)
    radiant.log.write_('steady_hearth', 0, fmt, ...)
@@ -19,7 +20,8 @@ end
 
 local shadow = _host:get_config('mods.steady_hearth.shadow_checks')
 shadow = shadow == true or shadow == 'true'
-local shadow_calls, shadow_mismatches = 0, 0
+local SHADOW_EVERY = math.max(1, tonumber(_host:get_config('mods.steady_hearth.shadow_every')) or 1)
+local shadow_seen, shadow_calls, shadow_mismatches = 0, 0, 0
 
 local function original_count(self, item_uri)
    local count = self:get_needed_item_count(item_uri)
@@ -58,13 +60,16 @@ local function get_needed_item_or_resource_count(self, item_uri)
    end
 
    if shadow then
+      shadow_seen = shadow_seen + 1
+   end
+   if shadow and shadow_seen % SHADOW_EVERY == 0 then
       local expected = original_count(self, item_uri)
       shadow_calls = shadow_calls + 1
       if expected ~= count then
          shadow_mismatches = shadow_mismatches + 1
          log('shadow desires_need_by_request: MISMATCH for %s: original %s, patched %s', tostring(item_uri), tostring(expected), tostring(count))
       end
-      if shadow_calls % 20000 == 0 then
+      if shadow_calls % 2000 == 0 then
          log('shadow desires_need_by_request: %d calls, %d mismatches', shadow_calls, shadow_mismatches)
       end
    end
