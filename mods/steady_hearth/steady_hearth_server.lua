@@ -41,13 +41,14 @@ local PATCHES = {
    'steady_hearth.patches.base_placement_requests_release',
    'steady_hearth.patches.ace_placement_requests_release',
    'steady_hearth.patches.ipf_search_lease_dispatch',
+   'steady_hearth.patches.desires_need_by_request',
 }
 
 local function log(fmt, ...)
    radiant.log.write_('steady_hearth', 0, fmt, ...)
 end
 
-local VERSION = '1.0.0'   -- keep in step with CHANGELOG.md
+local VERSION = '1.1.0'   -- keep in step with CHANGELOG.md
 
 local function enabled(patch)
    local value = _host:get_config('mods.steady_hearth.patches.' .. patch.id)

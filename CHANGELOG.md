@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 (2026-10-29)
+
+- Harvest need ratings (`desires_need_by_request`, base game and ACE): harvest actions rate each candidate from the materials the town has actually requested instead of every combination of the item's material tags. Same results (checked call by call), and the cost of this code falls from 10.1% to 0.3% of Lua time in the ACE benchmark.
+
 ## 1.0.0 (2026-10-29)
 
 First public release.

@@ -30,6 +30,7 @@ The mod patches the game's Lua code at load time. Each patch first checks that t
 | Building plan freeze (E9) | ACE | Plans clone their nav grid with uninitialized bounds, which can cause multi-minute pauses in about one game in ten | **No pause**; every clone takes 0 to 1 ms |
 | Search early exit (RT1, RT2) | Base game and ACE | Item searches keep running after their answer is known; orphaned timers cause engine CHECK failures | Base game busy time **-2.3%** (p 0.009), job-list time **-8.0%** (p 0.004); duplicate AI decisions 5,000 to 12,000 per game day to 0 |
 | Lease release fan-out | Base game and ACE | Every path search listens to every item lease release in the town | Lua time in path-search code **7.2% to 1.5%** of all Lua samples |
+| Harvest need ratings | Base game and ACE | Harvest actions rate every candidate tree or bush by checking every combination of its material tags against the town's requests | Share of Lua time in this code **10.1% to 0.3%** (ACE benchmark); identical results, checked call by call |
 | Stale placement requests (E1, A2b) | Base game and ACE | Placement requests stay in town tables after placement, so workers keep checking placed items (5 s each) | Stale requests after two game days **64 to 0** |
 | Script errors (RT6, X7) | Base game / ACE | A building-monitor error and an ACE titles error in multiplayer towns | Errors gone |
 
@@ -70,6 +71,7 @@ Every fix has a switch. Add it to the `user_settings.json` file in your Stonehea
 | `ace_plan_clone_empty_bounds` | on | Building plan freeze, used only when the nav-grid fix is off |
 | `base_anywhere_single_output`, `ace_anywhere_single_output`, `base_fabricate_single_output`, `ace_fabricate_single_output` | on | Search early exit |
 | `ipf_search_lease_dispatch` | on | Lease release fan-out |
+| `desires_need_by_request` | on | Harvest need ratings |
 | `base_placement_requests_release`, `ace_placement_requests_release` | on | Stale placement requests |
 | `base_chunk_node_working_regions`, `ace_titles_nil_threshold` | on | Script errors |
 | `grid_location_trace` | off | Fewer allocations in position traces; correct, but no measurable gain yet |
@@ -79,7 +81,7 @@ Patches named `ace_*` only install when ACE is present, and most `base_*` patche
 
 ## Reporting problems
 
-Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.0.0: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
+Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.1.0: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How this was made
 
