@@ -1,0 +1,46 @@
+name: Bug report
+description: Something goes wrong with Steady Hearth installed
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please check whether the problem also happens with Steady Hearth removed, and report problems with ACE itself to the ACE team.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce
+      description: Steps, or what was going on in your town when it happened.
+  - type: dropdown
+    id: ace
+    attributes:
+      label: Is ACE installed?
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Steady Hearth version
+      description: The game log shows it at startup, in a line like `steady_hearth 1.0.0`.
+  - type: textarea
+    id: switches
+    attributes:
+      label: Switches you changed
+      description: Any `steady_hearth` patch switches in your `user_settings.json`. Does the problem go away with one of them turned off?
+  - type: textarea
+    id: log
+    attributes:
+      label: stonehearth.log
+      description: Attach `stonehearth.log` from your Stonehearth folder (drag the file here), or paste the part around the error.
+    validations:
+      required: true

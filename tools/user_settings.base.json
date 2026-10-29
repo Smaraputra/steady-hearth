@@ -1,0 +1,12 @@
+{
+	"user_id" : "00000000-0000-4000-8000-5e0000000001",
+	"enable_auto_save" : false,
+	"multiplayer" : {
+		"server" : {
+			"default" : {
+				"max_players" : 1,
+				"remote_connections_enabled" : false
+			}
+		}
+	}
+}

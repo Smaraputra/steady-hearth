@@ -1,0 +1,10 @@
+{
+   "info" : {
+      "name" : "Perf Bench",
+      "namespace" : "perf_bench",
+      "version" : 3
+   },
+   "mixintos" : {
+      "stonehearth_autotest/tests/index.json" : "file(tests/index_mixin.json)"
+   }
+}

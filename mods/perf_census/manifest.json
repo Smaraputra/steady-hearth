@@ -1,0 +1,9 @@
+{
+   "info" : {
+      "name" : "Perf Census",
+      "namespace" : "perf_census",
+      "version" : 3
+   },
+   "server_init_script" : "file(perf_census_server)",
+   "client_init_script" : "file(perf_census_client)"
+}

@@ -1,0 +1,8 @@
+{
+   "info" : {
+      "name" : "Steady Hearth",
+      "namespace" : "steady_hearth",
+      "version" : 3
+   },
+   "server_init_script" : "file(steady_hearth_server)"
+}

@@ -1,0 +1,9 @@
+{
+   "info" : {
+      "name" : "Perf Probe",
+      "namespace" : "perf_probe",
+      "version" : 3
+   },
+   "server_init_script" : "file(perf_probe_server)",
+   "client_init_script" : "file(perf_probe_client)"
+}

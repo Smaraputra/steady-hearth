@@ -1,0 +1,26 @@
+{
+   "worlds" : {
+      "perf_bench_flat" : {
+         "world_generator" : "file(bench_world.lua)",
+         "groups" : {
+            "perf_bench" : {
+               "name" : "Fixed-work benchmark scenarios (select one with the function option)",
+               "scripts" : [
+                  "file(bench_scenarios.lua)"
+               ]
+            }
+         }
+      },
+      "perf_bench_large" : {
+         "world_generator" : "file(bench_world_large.lua)",
+         "groups" : {
+            "perf_bench_large" : {
+               "name" : "Fixed-time 4-player late-game benchmark (100+ hearthlings, 40 buildings)",
+               "scripts" : [
+                  "file(bench_xl.lua)"
+               ]
+            }
+         }
+      }
+   }
+}

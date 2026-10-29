@@ -1,0 +1,7 @@
+# Game, ACE and run output stay local
+stonehearth_game/
+stonehearth_ace/
+runs/
+*.smod
+__pycache__/
+.DS_Store

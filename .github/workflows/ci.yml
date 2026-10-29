@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua 5.1 (the game's Lua version)
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+
+      - name: Lua syntax (luac5.1 -p on every mod file)
+        run: |
+          find mods -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          echo "$(find mods -name '*.lua' | wc -l) Lua files parsed"
+
+      - name: Mod manifests are valid JSON
+        run: |
+          for f in $(find mods -name 'manifest.json'); do python3 -m json.tool "$f" > /dev/null && echo "ok $f"; done
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Harness tool tests
+        run: python3 -m unittest discover -s tools/tests -t . -v
