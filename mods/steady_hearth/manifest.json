@@ -2,7 +2,8 @@
    "info" : {
       "name" : "Steady Hearth",
       "namespace" : "steady_hearth",
-      "version" : 3
+      "version" : 3,
+      "steam_file_id" : "3830019326"
    },
    "server_init_script" : "file(steady_hearth_server)",
    "overrides" : {
