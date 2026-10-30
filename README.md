@@ -4,6 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/Smaraputra/steady-hearth/releases/latest"><img src="https://img.shields.io/github/v/release/Smaraputra/steady-hearth" alt="Latest release"></a>
+  <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3830019326"><img src="https://img.shields.io/badge/Steam%20Workshop-subscribe-1b2838" alt="Steam Workshop"></a>
   <a href="https://github.com/Smaraputra/steady-hearth/actions/workflows/ci.yml"><img src="https://github.com/Smaraputra/steady-hearth/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Stonehearth-1.1.0.949-8a6d3b" alt="Stonehearth 1.1.0.949">
   <img src="https://img.shields.io/badge/ACE-compatible%2C%20optional-4c7a34" alt="Compatible with ACE, not required">
@@ -55,13 +56,17 @@ Two of these replace a whole game file rather than patching a function: `stonehe
 
 ## Install
 
+**From the Steam Workshop:** subscribe to [Steady Hearth on the Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3830019326), start the game, and make sure **Steady Hearth** is enabled in the main menu's mod list. Steam keeps it up to date.
+
+**By hand:**
+
 1. Download `steady_hearth-<version>.zip` from the [latest release](https://github.com/Smaraputra/steady-hearth/releases/latest) and extract it (or download this repository with **Code > Download ZIP** and use its `mods/steady_hearth` folder).
 2. Copy the folder `steady_hearth` into your Stonehearth `mods` folder, for example `Steam/steamapps/common/Stonehearth/mods/steady_hearth`.
 3. Start the game. If the mod is not already enabled, enable **Steady Hearth** in the main menu's mod list.
 
-ACE is optional. With ACE installed the ACE fixes apply automatically. Without it only the base-game fixes do. Keep the folder name `steady_hearth`.
+Use one of the two, not both, so the game loads Steady Hearth only once. ACE is optional. With ACE installed the ACE fixes apply automatically. Without it only the base-game fixes do. Keep the folder name `steady_hearth`.
 
-**Uninstall:** delete the folder. Saves made with the mod load without it, because no change adds anything to a town's saved state. The journal change only drops journal pages older than 30 days, which the game never shows, and Steady Hearth's autosaves are ordinary saves.
+**Uninstall:** unsubscribe on the Workshop, or delete the folder. Saves made with the mod load without it, because no change adds anything to a town's saved state. The journal change only drops journal pages older than 30 days, which the game never shows, and Steady Hearth's autosaves are ordinary saves.
 
 **Compatibility:** tested with Stonehearth 1.1.0.949, with and without ACE at commit `f55f2c146` (`unstable-work`). Single player only so far. Multiplayer is untested.
 
