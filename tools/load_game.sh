@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Load a saved game (a perf_bench fixture) without the autotest, to time a save load.
 #
-# Usage: [LOAD_EXIT_AFTER_S=s] [LOAD_TIMEOUT=s] tools/load_game.sh <save id> <variant: vanilla|ace> [label] [extra key=value ...]
+# Usage: [LOAD_EXIT_AFTER_S=s] [LOAD_TIMEOUT=s] [LOAD_DEPLOY="mod ..."] tools/load_game.sh <save id> <variant: vanilla|ace> [label] [extra key=value ...]
 #
 # The game starts at the title screen with the same mods the fixture was made with (the autotest mods
 # stay enabled so the saved mod list matches; they only run tests on a new game). perf_probe's UI script
@@ -9,7 +9,9 @@
 # seconds (default 60) after the game screen is ready. It requests the load once per launch (the
 # launch token below), whatever screen a later UI reload shows. The PERF_PROBE|startup, |load and
 # |ui_mark lines in the run's stonehearth.log split the launch and the load into phases
-# (tools/load_report.py).
+# (tools/load_report.py). LOAD_DEPLOY lists the mods deployed from this repo first (default:
+# perf_probe steady_hearth perf_bench), so a run can test a packed steady_hearth.smod placed in the
+# game's mods/ folder by hand (pass mods.zip.steady_hearth.enabled=true).
 set -u
 save_id="$1"; variant="$2"; label="${3:-load}"; shift $(( $# >= 3 ? 3 : $# ))
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -21,7 +23,8 @@ case "$variant" in
 esac
 
 # the game runs the copies in its mods/ folder, so deploy this repo's mods first
-"$here/deploy_mods.sh" perf_probe steady_hearth perf_bench > /dev/null || exit 1
+# shellcheck disable=SC2086 # a list of mod names
+"$here/deploy_mods.sh" ${LOAD_DEPLOY:-perf_probe steady_hearth perf_bench} > /dev/null || exit 1
 
 exec "$here/run_game.sh" "load-$variant-$label" "${LOAD_TIMEOUT:-900}" \
    mods.zip.stonehearth_ace.enabled=$ace \
