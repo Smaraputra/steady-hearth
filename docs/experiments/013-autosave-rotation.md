@@ -4,7 +4,7 @@ Date: 2026-10-30. Vanilla save loads of the XL v4 fixture (`tools/load_game.sh`)
 
 ## Why
 
-The base game autosaves every 5 minutes into one slot, `auto_save`, shared by every town (`stonehearth/ui/root/js/root_view.js`). A crash while saving, or a town saved in a bad state, leaves no earlier autosave to return to, and the interval cannot be changed. ACE already offers an interval setting and rotating slots, so this applies to the base game only.
+The base game autosaves every 5 minutes into one slot, `auto_save`, shared by every town (`stonehearth/ui/root/js/root_view.js`). A crash while saving, or a town saved in a state you want to undo, leaves no earlier autosave to return to, and the interval cannot be changed. ACE already offers an interval setting and rotating slots, so this applies to the base game only.
 
 ## Change
 

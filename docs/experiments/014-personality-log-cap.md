@@ -25,7 +25,7 @@ In the game, `perf_probe:fill_personality_log(60, 3)` (a diagnostic call handler
 | `20261030-005854-load-vanilla-journal-off` | off | 112 | 6,720 | 20,160 | 60,392 KB | 2.26 s | 0 |
 | `20261030-010040-load-vanilla-journal-on` | on | 112 | 3,360 | 20,160 | 55,628 KB | 1.91 s | 0 |
 
-The fixture itself saves at 53,512 KB, so 60 days of journals added about 6.9 MB (about 340 bytes per entry with its page), and the cap removed 4.8 MB of it (7.9% of the save). Uncapped journals grow by about 0.11 MB per game day for these 112 citizens and the capped ones stop growing after 30 days, so the difference widens with game length. The save request times come from single runs on a loaded machine (load average up to 39), so no save-time gain is claimed.
+The two runs differ only in the 3,360 pages (10,080 entries) the cap dropped: 4.8 MB, 7.9% of the save, about 1.4 KB per citizen per game day at 3 entries a day. Uncapped journals keep growing at that rate for every citizen, about 0.16 MB per game day for these 112 citizens, while the capped ones stop growing after 30 days, so the difference widens with game length. (Measured against the fixture's own save, 53,512 KB, 60 days of journals add 6.9 MB, about 1 KB per page, but that comparison also takes in everything else that differs between the two saves, so the paired runs are the measure used here.) The save request times come from single runs on a loaded machine (load average up to 39), so no save-time gain is claimed.
 
 ## Reviews
 

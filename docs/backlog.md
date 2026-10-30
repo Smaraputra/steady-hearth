@@ -8,7 +8,7 @@ The v4 reference profiles (`docs/atlas/profiles-2026-10-28.md`, section "Scenari
 
 Done since: the material check memo (experiment 009, Steady Hearth 1.2.0) cut material checks from 4.1% to 2.8% (vanilla) and 7.3% to 5.1% (ACE). The restock director's two dead caches (an item rating cache that is filled but never read, and an errand validity cache that expires after 20 ms because of a unit mix-up) are confirmed in code, but turning them on changed which errands hearthlings took and the runs with them did less town work, so both ship off by default. New lever found on the way: the game reads hot tables with `rawget`, which under the shipped PUC Lua 5.1 is a C call about three times the cost of a plain index. Next candidates: a survey of hot `rawget` sites by measured share (behaviour-preserving where the table has no metatable), and single-change A/B pairs for the two restock caches.
 
-Known ACE workload difference (not a bug in the scenario): under ACE the scenario's maintain orders leave the crafter lists before the measured window, and the crafters work on fixture orders and ingredient chains that mostly lack ingredients, so ACE crafts 4 or 5 items per town per game day against 14 or 15 in vanilla (`docs/harness/bench.md`, scenario xl-v4).
+Known ACE workload difference (the scenario works as intended): under ACE the scenario's maintain orders leave the crafter lists before the measured window, and the crafters work on fixture orders and ingredient chains that mostly lack ingredients, so ACE crafts 4 or 5 items per town per game day against 14 or 15 in vanilla (`docs/harness/bench.md`, scenario xl-v4).
 
 ## Tier 1: measured, large
 

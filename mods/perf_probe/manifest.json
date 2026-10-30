@@ -18,6 +18,10 @@
       "fill_personality_log" : {
          "controller" : "file(call_handlers/personality_fill_call_handler.lua)",
          "endpoint" : "server"
+      },
+      "camera" : {
+         "controller" : "file(call_handlers/camera_call_handler.lua)",
+         "endpoint" : "client"
       }
    },
    "ui" : {

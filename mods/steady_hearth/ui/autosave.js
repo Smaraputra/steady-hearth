@@ -1,7 +1,7 @@
 // Steady Hearth: autosave for the base game with an adjustable interval and rotating slots.
 //
-// The base game saves every 5 minutes into one slot, 'auto_save', shared by every town, so one bad
-// save (a crash while saving, a town in a bad state) leaves nothing to go back to. With
+// The base game saves every 5 minutes into one slot, 'auto_save', shared by every town, so a save
+// cut short by a crash, or a town saved in a state you want to undo, leaves nothing to go back to. With
 // mods.steady_hearth.patches.autosave_rotation on (the default), each autosave goes into a new save
 // 'steady_autosave_<time>', and only after it succeeds are the world's older autosaves beyond
 // mods.steady_hearth.autosave_slots (default 3) deleted. mods.steady_hearth.autosave_minutes (default 5)
