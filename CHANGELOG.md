@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1 (2026-10-31)
+
+No change in behaviour.
+- The mod folder now includes `NOTICE.md` with Steady Hearth's MIT License and the MIT License of Stonehearth ACE, whose code some patches copy with marked changes, so the notice travels with every copy of the mod.
+- The manifest carries the mod's Steam Workshop item id (`info.steam_file_id`), as ACE's does. Steady Hearth is on the [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3830019326).
+- Comment wording in `ui/autosave.js`.
+
 ## 1.3.0 (2026-10-30)
 
 Faster loading, smaller saves and a better autosave. Every change has a switch and is on by default.

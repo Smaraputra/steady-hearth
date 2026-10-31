@@ -124,7 +124,7 @@ Patches named `ace_*` only install when ACE is present, and most `base_*` patche
 
 ## Reporting problems
 
-Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.3.0: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
+Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.3.1: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How this was made
 
@@ -160,4 +160,4 @@ The ACE-specific findings are written up in [`docs/ace-notes.md`](docs/ace-notes
 
 ## License and credits
 
-The code in this repository is released under the MIT License (see [`LICENSE`](LICENSE)). Patches that replace a game or ACE function, and the files that replace a game file (Steady Hearth's `loading.html` and `material.lua`, and `perf_probe`'s diagnostic copies of the game's start-up scripts), contain a copy of that code with marked changes. Those excerpts remain the property of their authors, Radiant Entertainment for the base game and the Stonehearth ACE team for ACE (MIT License). Stonehearth is a trademark of its owners. The banner and icon are original artwork made for this project with an AI image generator. Thanks to the ACE team for keeping Stonehearth alive.
+The code in this repository is released under the MIT License (see [`LICENSE`](LICENSE)). Patches that replace a game or ACE function, and the files that replace a game file (Steady Hearth's `loading.html` and `material.lua`, and `perf_probe`'s diagnostic copies of the game's start-up scripts), contain a copy of that code with marked changes. Those excerpts remain the property of their authors, Radiant Entertainment for the base game and the Stonehearth ACE team for ACE (MIT License). The mod folder's [`NOTICE.md`](mods/steady_hearth/NOTICE.md) carries both licenses and travels with every copy of the mod. Stonehearth is a trademark of its owners. The banner and icon are original artwork made for this project with an AI image generator. Thanks to the ACE team for keeping Stonehearth alive.
