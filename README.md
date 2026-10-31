@@ -60,7 +60,7 @@ Two of these replace a whole game file rather than patching a function: `stonehe
 
 **By hand:**
 
-1. Download `steady_hearth-<version>.zip` from the [latest release](https://github.com/Smaraputra/steady-hearth/releases/latest) and extract it (or download this repository with **Code > Download ZIP** and use its `mods/steady_hearth` folder).
+1. Download `steady_hearth-<version>.zip` from the [latest release](https://github.com/Smaraputra/steady-hearth/releases/latest) or from [Nexus Mods](https://www.nexusmods.com/stonehearth/mods/27) and extract it (or download this repository with **Code > Download ZIP** and use its `mods/steady_hearth` folder).
 2. Copy the folder `steady_hearth` into your Stonehearth `mods` folder, for example `Steam/steamapps/common/Stonehearth/mods/steady_hearth`.
 3. Start the game. If the mod is not already enabled, enable **Steady Hearth** in the main menu's mod list.
 
