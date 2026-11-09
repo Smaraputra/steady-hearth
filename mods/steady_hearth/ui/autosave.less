@@ -10,19 +10,67 @@
       margin: 0 6px 0 10px;
    }
 
-   select {
+   .steadySelect {
+      position: relative;
+      display: inline-block;
+   }
+
+   button {
       font: inherit;
       color: #e8dcb8;
       background: #322f28;
       border: 1px solid #bca058;
       border-radius: 2px;
-      padding: 2px 4px;
+      box-shadow: none;
+      padding: 2px 22px 2px 6px;
+      min-width: 88px;
       min-height: 28px;
+      position: relative;
+      text-align: left;
       cursor: pointer;
    }
 
-   select:focus {
+   // the caret marks the button as a list that opens upward, where it opens
+   button:after {
+      content: '';
+      position: absolute;
+      right: 7px;
+      top: 50%;
+      margin-top: -3px;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-bottom: 5px solid #bca058;
+   }
+
+   button:focus {
       outline: 2px solid #cbb373;
       outline-offset: 1px;
+   }
+
+   // above the button: this row is the last thing in the dialog
+   ul {
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      min-width: 100%;
+      box-sizing: border-box;
+      margin: 0 0 2px 0;
+      padding: 0;
+      list-style: none;
+      background: #322f28;
+      border: 1px solid #bca058;
+      border-radius: 2px;
+      z-index: 10;
+   }
+
+   li {
+      color: #e8dcb8;
+      padding: 4px 6px;
+      cursor: pointer;
+   }
+
+   li.active {
+      color: #322f28;
+      background: #cbb373;
    }
 }

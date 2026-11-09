@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.3 (2026-11-09)
+
+- Autosave settings (base game): the interval and autosave count in the save dialog are now lists drawn in the page, because the popup of a native dropdown did not display properly in the game's embedded browser. The choices, the saved settings and keyboard use are unchanged.
+
 ## 1.3.2 (2026-11-09)
 
 Two script errors no longer appear, with and without ACE. Both changes have a switch and are on by default, and neither adds saved data.

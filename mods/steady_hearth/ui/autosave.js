@@ -155,18 +155,107 @@
          });
    };
 
+   var listClosers = [];   // one per list; a dialog that hides or goes away closes its open lists
+
+   // A list drawn in the page, because the popup of a native <select> does not display properly in
+   // the game's embedded browser. The button keeps the focus: arrows, Home and End move through the
+   // list, Enter or Space picks, Escape and Tab close it.
    var addSelect = function (container, id, label, choices, current, format, key) {
-      var select = $('<select>').attr('id', id);
+      var root = $('<span>').addClass('steadySelect');
+      var button = $('<button>').attr({ id: id, type: 'button', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' })
+         .text(format(current));
+      var list = $('<ul>').attr('role', 'listbox').hide();
+      var selected = choices.indexOf(current);
+      var active = selected;
+      var isOpen = false;
+
+      var highlight = function (index) {
+         active = Math.max(0, Math.min(choices.length - 1, index));
+         list.children().removeClass('active').attr('aria-selected', 'false');
+         list.children().eq(active).addClass('active').attr('aria-selected', 'true');
+         button.attr('aria-activedescendant', id + '_' + choices[active]);
+      };
+
+      var close = function () {
+         isOpen = false;
+         list.hide();
+         button.attr('aria-expanded', 'false').removeAttr('aria-activedescendant');
+         $(document).off('mousedown.' + id);
+      };
+
+      var open = function () {
+         isOpen = true;
+         list.show();
+         button.attr('aria-expanded', 'true');
+         highlight(selected);
+         $(document).on('mousedown.' + id, function (e) {
+            if (!$.contains(root[0], e.target)) {
+               close();
+            }
+         });
+      };
+
+      var choose = function (index) {
+         selected = index;
+         settings[key] = choices[index];
+         button.text(format(choices[index]));
+         radiant.call('radiant:set_config', KEYS[key], choices[index]);
+         close();
+      };
+
       $.each(choices, function (i, choice) {
-         $('<option>').attr('value', choice).text(format(choice)).appendTo(select);
+         $('<li>').attr({ id: id + '_' + choice, role: 'option' }).text(format(choice))
+            .on('mouseenter', function () {
+               highlight(i);
+            })
+            .on('click', function () {
+               choose(i);
+               button.focus();
+            })
+            .appendTo(list);
       });
-      select.val(String(current));
-      select.on('change', function () {
-         var value = parseInt(select.val(), 10);
-         settings[key] = value;
-         radiant.call('radiant:set_config', KEYS[key], value);
+
+      button.on('click', function () {
+         if (isOpen) {
+            close();
+         } else {
+            open();
+         }
       });
-      container.append($('<label>').attr('for', id).text(label)).append(select);
+
+      button.on('keydown', function (e) {
+         var keys = { 38: active - 1, 40: active + 1, 36: 0, 35: choices.length - 1 };
+         if (keys[e.which] !== undefined) {
+            e.preventDefault();
+            // on a closed list the arrows only open it, while Home and End also go to their end
+            var moves = isOpen || e.which === 36 || e.which === 35;
+            if (!isOpen) {
+               open();
+            }
+            if (moves) {
+               highlight(keys[e.which]);
+            }
+         } else if (isOpen && (e.which === 13 || e.which === 32)) {
+            e.preventDefault();
+            choose(active);
+         } else if (isOpen && e.which === 27) {
+            // the list closes, not the dialog behind it
+            e.stopPropagation();
+            close();
+         } else if (isOpen && e.which === 9) {
+            close();
+         }
+      });
+
+      root.append(button).append(list);
+      container.append($('<label>').attr('for', id).text(label)).append(root);
+      listClosers.push(close);
+   };
+
+   var closeLists = function () {
+      $.each(listClosers, function (i, close) {
+         close();
+      });
    };
 
    // two selectors beside the save dialog's autosave checkbox
@@ -195,6 +284,15 @@
          didInsertElement: function () {
             this._super();
             addControls(this);
+         },
+         hide: function () {
+            closeLists();
+            this._super();
+         },
+         willDestroyElement: function () {
+            closeLists();
+            listClosers = [];
+            this._super();
          },
       });
       // a save view built before this ran gets its controls when it is next shown

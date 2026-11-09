@@ -59,7 +59,7 @@ local function log(fmt, ...)
    radiant.log.write_('steady_hearth', 0, fmt, ...)
 end
 
-local VERSION = '1.3.2'   -- keep in step with CHANGELOG.md
+local VERSION = '1.3.3'   -- keep in step with CHANGELOG.md
 
 local function enabled(patch)
    local value = _host:get_config('mods.steady_hearth.patches.' .. patch.id)
