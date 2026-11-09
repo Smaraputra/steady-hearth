@@ -160,6 +160,10 @@ Timing runs need a quiet machine: the harness records the machine load and host 
 
 The ACE-specific findings are written up in [`docs/ace-notes.md`](docs/ace-notes.md), each with the exact lines involved and the patch that addresses it, in case any of them is useful upstream.
 
+## Contributing
+
+Steady Hearth is open source, and contributions are welcome through issues and pull requests. Contributions are accepted under the MIT License, and anything that will be published follows [`docs/publication-guidelines.md`](docs/publication-guidelines.md).
+
 ## License and credits
 
 The code in this repository is released under the MIT License (see [`LICENSE`](LICENSE)). Patches that replace a game or ACE function, and the files that replace a game file (Steady Hearth's `loading.html` and `material.lua`, and `perf_probe`'s diagnostic copies of the game's start-up scripts), contain a copy of that code with marked changes. Those excerpts remain the property of their authors, Radiant Entertainment for the base game and the Stonehearth ACE team for ACE (MIT License). The mod folder's [`NOTICE.md`](mods/steady_hearth/NOTICE.md) carries both licenses and travels with every copy of the mod. Stonehearth is a trademark of its owners. The banner and icon are original artwork made for this project with an AI image generator. Thanks to the ACE team for keeping Stonehearth alive.
