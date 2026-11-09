@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run one fixed-work benchmark scenario (perf_bench) with a client attached.
 #
-# Usage: [BENCH_TIMEOUT=seconds] [BENCH_SPEED=n] [PERF_CENSUS=true] [PERF_PROBE=true] [PERF_MOD=true] tools/bench.sh <size: s|m|xl> <variant: vanilla|ace> [label] [extra key=value ...]
+# Usage: [BENCH_TIMEOUT=seconds] [BENCH_SPEED=n] [PERF_CENSUS=true] [PERF_PROBE=true] [PERF_MOD=true] tools/bench.sh <size: s|m|xl|regress> <variant: vanilla|ace> [label] [extra key=value ...]
 # Every mod is set explicitly on or off; folder mods present in mods/ load by default otherwise.
 set -u
 size="$1"; variant="$2"; label="${3:-run}"; shift $(( $# >= 3 ? 3 : $# ))
@@ -17,7 +17,8 @@ case "$size" in
    s) timeout_s=1800 ;;
    m) timeout_s=4200 ;;
    xl) timeout_s=6000; group=perf_bench_large ;;
-   *) echo "size must be s, m or xl" >&2; exit 64 ;;
+   regress) timeout_s=900; group=perf_bench_regress ;;
+   *) echo "size must be s, m, xl or regress" >&2; exit 64 ;;
 esac
 # BENCH_TIMEOUT (seconds) cuts a diagnostic run short, for example after the warm-up
 timeout_s="${BENCH_TIMEOUT:-$timeout_s}"

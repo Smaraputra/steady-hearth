@@ -50,13 +50,16 @@ local PATCHES = {
    'steady_hearth.patches.base_resource_keys_by_uri',
    'steady_hearth.patches.ace_resource_keys_by_uri',
    'steady_hearth.patches.personality_log_cap',
+   'steady_hearth.patches.base_ladder_off_world',
+   'steady_hearth.patches.ace_ladder_off_world',
+   'steady_hearth.patches.teleport_single_request',
 }
 
 local function log(fmt, ...)
    radiant.log.write_('steady_hearth', 0, fmt, ...)
 end
 
-local VERSION = '1.3.1'   -- keep in step with CHANGELOG.md
+local VERSION = '1.3.2'   -- keep in step with CHANGELOG.md
 
 local function enabled(patch)
    local value = _host:get_config('mods.steady_hearth.patches.' .. patch.id)

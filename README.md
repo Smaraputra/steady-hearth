@@ -102,6 +102,8 @@ Every fix has a switch. Add it to the `user_settings.json` file in your Stonehea
 | `base_resource_keys_by_uri`, `ace_resource_keys_by_uri` | on | Inventory restore |
 | `personality_log_cap` | on | Citizen journals, keeping `personality_log_days` days (default 30) |
 | `autosave_rotation` | on | Autosave (base game). The dialog writes `autosave_minutes` and `autosave_slots` |
+| `base_ladder_off_world`, `ace_ladder_off_world` | on | Script error when a hearthling leaves the map just before building a ladder |
+| `teleport_single_request` | on | Script error after a repeated teleport request |
 | `base_restock_rating_cache` | off | Uses the restock director's unused rating cache. It changes which errands hearthlings pick and is not yet measured on its own |
 | `base_restock_validity_window`, `ace_restock_validity_window` | off | Trusts a checked restock errand for about a second. Runs with it on did less town work, so it is off until measured on its own |
 | `grid_location_trace` | off | Fewer allocations in position traces. Correct, but no measurable gain yet |
@@ -124,7 +126,7 @@ Patches named `ace_*` only install when ACE is present, and most `base_*` patche
 
 ## Reporting problems
 
-Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.3.1: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
+Open an [issue](https://github.com/Smaraputra/steady-hearth/issues/new/choose) with your `stonehearth.log`, whether ACE is installed, and what happened. If a problem goes away with a switch turned off, say which one. The log shows the installed version at startup (`steady_hearth 1.3.2: installing patches`). Changes per version are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How this was made
 

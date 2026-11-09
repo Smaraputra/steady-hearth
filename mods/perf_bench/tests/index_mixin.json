@@ -8,6 +8,12 @@
                "scripts" : [
                   "file(bench_scenarios.lua)"
                ]
+            },
+            "perf_bench_regress" : {
+               "name" : "Regression scenario for the ladder and teleport script errors",
+               "scripts" : [
+                  "file(bench_regress.lua)"
+               ]
             }
          }
       },

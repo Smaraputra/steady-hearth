@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.2 (2026-11-09)
+
+Two script errors no longer appear, with and without ACE. Both changes have a switch and are on by default, and neither adds saved data.
+- Ladder building (`base_ladder_off_world`, `ace_ladder_off_world`): a town can take a hearthling off the map at any moment, when a player disconnects or the hearthling leaves on a dispatch quest. A hearthling that was about to build a ladder at that moment now drops the task and carries on when it returns, instead of raising a script error.
+- Teleporting (`teleport_single_request`): a teleport requested while another is pending for the same hearthling now changes the destination. Previously the teleport action stayed installed after the hearthling arrived, with no destination left, and raised a script error each time it ran.
+- Regression scenario: `tools/bench.sh regress <vanilla|ace> <label>` reproduces both errors with the switches off and shows none with them on (`docs/experiments/015-ladder-teleport-errors.md`).
+
 ## 1.3.1 (2026-10-31)
 
 No change in behaviour.
